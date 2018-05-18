@@ -1,0 +1,10 @@
+[Desktop Entry]
+Type=Application
+Name=Modelcar IDE
+Comment=Eclipse Integrated Development Environment
+Icon=/opt/programs/eclipse/icon.xpm
+Path=/opt/programs/eclipse/
+Exec=bash -ic './start_eclipse.sh'
+Terminal=false
+Categories=Development;IDE;Java;
+StartupWMClass=Eclipse
