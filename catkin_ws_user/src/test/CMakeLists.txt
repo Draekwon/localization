@@ -8,11 +8,14 @@ project(test)
 ## if COMPONENTS list like find_package(catkin REQUIRED COMPONENTS xyz)
 ## is used, also find other catkin packages
 find_package(catkin REQUIRED COMPONENTS
-  cv_bridge
-  roscpp
-  sensor_msgs
-  std_msgs
+sensor_msgs
+cv_bridge
+roscpp
+std_msgs
+image_transport
 )
+
+add_compile_options(-std=c++11)
 
 find_package(OpenCV REQUIRED)
 

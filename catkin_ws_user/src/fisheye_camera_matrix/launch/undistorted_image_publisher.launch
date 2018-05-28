@@ -1,4 +1,9 @@
 <?xml version="1.0"?>
 <launch>
+  <!-- arg <calib>: name of the .calib file in catkin_ws/src/camera_matrix/config/ to load -->
+  <arg name="calib" default="test" />
+  
+  <node name="camera_matrix_publisher" pkg="fisheye_camera_matrix" type="camera_matrix_publisher" args="$(arg calib).calib" output="screen" />
+
   <node name="undistorted_image_publisher" pkg="fisheye_camera_matrix" type="undistorted_image_publisher" output="screen" />
 </launch>

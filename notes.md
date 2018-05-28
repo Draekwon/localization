@@ -38,6 +38,10 @@ which makes everything said above useless/pointless
 
 --------------------------------------
 
+in simulator the camera is 40.5 cm above the board, so ~43-44 cm above ground
+
+--------------------------------------
+
 https://www.ri.cmu.edu/pub_files/pub1/dellaert_frank_1999_2/dellaert_frank_1999_2.pdf
 
 --------------------------------------
