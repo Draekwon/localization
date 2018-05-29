@@ -43,7 +43,7 @@ include
 
 ## Declare a C++ library
 # add_library(${PROJECT_NAME}
-#   src/${PROJECT_NAME}/test.cpp
+#   src/${PROJECT_NAME}/keks.cpp
 # )
 
 ## Add cmake target dependencies of the library
@@ -54,11 +54,16 @@ include
 ## Declare a C++ executable
 ## With catkin_make all packages are built within a single CMake context
 ## The recommended prefix ensures that target names across packages don't collide
-add_executable(${PROJECT_NAME}_node src/test_main.cpp)
+add_executable(${PROJECT_NAME}_cameraOverlay src/camera_overlay.cpp)
+add_executable(${PROJECT_NAME}_forceMapGenerator src/forcemap_generator.cpp)
 
 ## Specify libraries to link a library or executable target against
-target_link_libraries(${PROJECT_NAME}_node
+target_link_libraries(${PROJECT_NAME}_cameraOverlay
   ${catkin_LIBRARIES}
   ${OpenCV_LIBS}
 )
 
+target_link_libraries(${PROJECT_NAME}_forceMapGenerator
+  ${catkin_LIBRARIES}
+  ${OpenCV_LIBS}
+)
