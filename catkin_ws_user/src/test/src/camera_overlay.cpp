@@ -19,6 +19,9 @@
 #include "std_msgs/String.h"
 #include <tf/transform_broadcaster.h>
 #include <nav_msgs/Odometry.h>
+#include "geometry_msgs/Point.h"
+#include "visualization_msgs/Marker.h"
+#include "visualization_msgs/MarkerArray.h"
 // opencv
 #include "opencv2/core/core.hpp"
 #include "opencv2/highgui/highgui.hpp"
@@ -33,6 +36,11 @@
 using namespace std;
 using namespace cv;
 using namespace cv::xfeatures2d;
+
+const double SCALE_TO_PX = 1114.0 / 600.0;
+const double SCALE_TO_CM = 600.0 / 1114.0;
+const int CAR_WIDTH = 44;
+const int CAR_HEIGHT = 92;
 
 //! copy the following code for benchmarking:
 /*
@@ -52,7 +60,11 @@ class CCameraOverlay
 	image_transport::Publisher m_oImagePub;
 	geometry_msgs::Pose m_oPose;
 
+	ros::Publisher vis_pub;
+
 	Mat m_oMapImg;
+	Mat m_oForceMap;
+	Mat m_oDistanceMap;
 
 	ros::Subscriber m_oOdomSub;
 
@@ -61,7 +73,12 @@ public:
 	CCameraOverlay()
 	: m_oImgTransport(m_oNodeHandle)
 	{
-		m_oMapImg = imread("../../../../localization/captures/Lab_map_600x400_scaled.png", IMREAD_GRAYSCALE);
+		m_oMapImg = imread("../../../captures/Lab_map_600x400_scaled.png", IMREAD_GRAYSCALE);
+
+		cv::FileStorage fs("../../../forcemap.xml", cv::FileStorage::READ);
+		fs["ForceMap"] >> m_oForceMap;
+		cv::FileStorage fs2("../../../distancemap.xml", cv::FileStorage::READ);
+		fs2["DistanceMap"] >> m_oDistanceMap;
 
 		// Subscribe to input video feed and publish output video feed
 		m_oImageSub = m_oImgTransport.subscribe("/usb_cam/image_undistorted", 1,
@@ -69,14 +86,13 @@ public:
 		m_oImagePub = m_oImgTransport.advertise("/camera_overlay", 1);
 
 		m_oOdomSub = m_oNodeHandle.subscribe("/odom", 1, &CCameraOverlay::OdomCallback, this);
-
-//		namedWindow("Image window");
 	}
 
 	~CCameraOverlay()
 	{
-//		destroyWindow("Image window");
+		destroyWindow("Display window");
 	}
+
 
 	void OdomCallback(const nav_msgs::OdometryConstPtr& msg)
 	{
@@ -85,7 +101,7 @@ public:
 
 	void ImageCallback(const sensor_msgs::ImageConstPtr& msg)
 	{
-//		clock_t t1 = clock();
+		clock_t t1 = clock();
 
 		cv_bridge::CvImagePtr pCvImg;
 
@@ -101,6 +117,12 @@ public:
 		  return;
 		}
 
+		Rect oModelCarRect(Rect(pCvImg->image.cols / 2 - CAR_WIDTH / 2,
+				pCvImg->image.rows / 2 - CAR_HEIGHT / 2,
+				CAR_WIDTH, CAR_HEIGHT));
+		Mat emptyMat = Mat::zeros(CAR_HEIGHT, CAR_WIDTH, CV_8UC1);
+		emptyMat.copyTo(pCvImg->image(oModelCarRect));
+
 		vector<vector<Point> > contours;
 		vector<Vec4i> hierarchy;
 	    findContours(pCvImg->image, contours, hierarchy, RETR_EXTERNAL, CHAIN_APPROX_NONE, Point(0,0));
@@ -112,8 +134,8 @@ public:
 			drawContours( oContourImg, contours, (int)i, color, 3, 8, hierarchy, 0, Point() );
 		}
 
-	    int nPixelX = (600.0 - m_oPose.position.y * 100.0) * (130.0 / 70.0);
-	    int nPixelY = (600.0 - m_oPose.position.x * 100.0) * (130.0 / 70.0);
+	    int nPixelX = (600.0 - m_oPose.position.y * 100.0) * SCALE_TO_PX;
+	    int nPixelY = (600.0 - m_oPose.position.x * 100.0) * SCALE_TO_PX;
 	    Point oCenter(nPixelX, nPixelY);
 
 	    Point2f oSmallImageCenter((oContourImg.cols - 1) / 2.0, (oContourImg.rows - 1) / 2.0);
@@ -131,37 +153,60 @@ public:
 
 	    try {
 
-	    Point oTopLeft(oCenter.x - oRotatedImage.cols / 2, oCenter.y - oRotatedImage.rows / 2);
-	    Rect oRegionOfInterest(oTopLeft, oRotatedImage.size());
+			Point oTopLeft(oCenter.x - oRotatedImage.cols / 2, oCenter.y - oRotatedImage.rows / 2);
+			Rect oRegionOfInterest(oTopLeft, oRotatedImage.size());
 
-	    int nCroppedX = oTopLeft.x < 0 ? -oTopLeft.x : 0;
-	    int nCroppedY = oTopLeft.y < 0 ? -oTopLeft.y : 0;
-	    int nCroppedWidth = oRegionOfInterest.width - nCroppedX - 1;
-	    int nCroppedHeight = oRegionOfInterest.height - nCroppedY - 1;
+			int nCroppedX = oTopLeft.x < 0 ? -oTopLeft.x : 0;
+			int nCroppedY = oTopLeft.y < 0 ? -oTopLeft.y : 0;
+			int nCroppedWidth = oRegionOfInterest.width - nCroppedX - 1;
+			int nCroppedHeight = oRegionOfInterest.height - nCroppedY - 1;
 
-	    nCroppedWidth -= oTopLeft.x + oRegionOfInterest.width >= oMapImg.cols ?
-	    		oTopLeft.x + oRegionOfInterest.width - oMapImg.cols: 0;
-	    nCroppedHeight -= oTopLeft.y + oRegionOfInterest.height >= oMapImg.rows ?
-	    		oTopLeft.y + oRegionOfInterest.height - oMapImg.rows: 0;
+			nCroppedWidth -= oTopLeft.x + oRegionOfInterest.width >= oMapImg.cols ?
+					oTopLeft.x + oRegionOfInterest.width - oMapImg.cols: 0;
+			nCroppedHeight -= oTopLeft.y + oRegionOfInterest.height >= oMapImg.rows ?
+					oTopLeft.y + oRegionOfInterest.height - oMapImg.rows: 0;
 
-	    Rect oCropRoi(nCroppedX, nCroppedY, nCroppedWidth, nCroppedHeight);
-	    Mat oCroppedRotatedImage = oRotatedImage(oCropRoi);
+			Rect oCropRoi(nCroppedX, nCroppedY, nCroppedWidth, nCroppedHeight);
+			Mat oCroppedRotatedImage = oRotatedImage(oCropRoi);
 
-	    oRegionOfInterest = Rect(Point(oTopLeft.x + nCroppedX,
-	    		oTopLeft.y + nCroppedY), oCroppedRotatedImage.size());
+			oRegionOfInterest = Rect(Point(oTopLeft.x + nCroppedX,
+					oTopLeft.y + nCroppedY), oCroppedRotatedImage.size());
 
-	    Mat oDestinationRoi = oMapImg(oRegionOfInterest);
-	    oCroppedRotatedImage.copyTo(oDestinationRoi, oCroppedRotatedImage);
+			Mat oDestinationRoi = oMapImg(oRegionOfInterest);
+			oCroppedRotatedImage.copyTo(oDestinationRoi, oCroppedRotatedImage);
+
+			Point2d oForceVector(0,0);
+			Point2d oDistanceVector(0,0);
+			int counter = 0;
+			for (int nCol = 0; nCol < oCroppedRotatedImage.cols; nCol++)
+			{
+				for (int nRow = 0; nRow < oCroppedRotatedImage.rows; nRow++)
+				{
+					if (oCroppedRotatedImage.at<int>(nCol, nRow) > 128)
+					{
+						counter++;
+						oForceVector += m_oForceMap.at<Point2d>(nCol + oRegionOfInterest.x,
+								nRow + oRegionOfInterest.y);
+						oDistanceVector += m_oDistanceMap.at<Point2d>(nCol + oRegionOfInterest.x,
+								nRow + oRegionOfInterest.y);
+					}
+				}
+			}
+			oDistanceVector /= counter == 0 ? 1 : counter;
+			oDistanceVector = oDistanceVector * SCALE_TO_CM / 100;
+			cout << "oCenter " << oCenter << ", oForceVector " << oForceVector
+					<< ", oDistanceVector: " << oDistanceVector << endl;
+			cout << "oDistanceVector - oCenter " << oDistanceVector - Point2d(oCenter) << endl;
 
 	    }
 	    catch(Exception& e)
 	    {
-			  ROS_ERROR("img crop exception: %s", e.what());
+	    	ROS_ERROR("img crop exception: %s", e.what());
 	    }
 
 	    try
 	    {
-	    	cv::circle(oMapImg, oCenter, 10, (255,0,255), -1);
+	    	cv::circle(oMapImg, oCenter, 10, 255, -1);
 	    }
 		catch(Exception& e)
 		{
@@ -169,16 +214,12 @@ public:
 
 		}
 
-		// Update GUI Window
-//		cv::imshow("Image window", oMapImg);
-//		cv::waitKey(3);
-
 		sensor_msgs::ImagePtr oPubMsg = cv_bridge::CvImage(std_msgs::Header(), "mono8", oMapImg).toImageMsg();
 		// Output modified video stream
 		m_oImagePub.publish(oPubMsg);
 
-//		clock_t t2 = clock();
-//		cout << "fSecondTS - fFirstTimeStamp: " << (float(t2 - t1)/CLOCKS_PER_SEC) << endl;
+		clock_t t2 = clock();
+		cout << "fSecondTS - fFirstTimeStamp: " << (float(t2 - t1)/CLOCKS_PER_SEC) << endl;
 	}
 };
 
