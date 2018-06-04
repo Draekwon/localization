@@ -16,8 +16,8 @@
 using namespace cv;
 using namespace std;
 
-const double SCALE_TO_PX = 1114.0 / 600.0;
-const double SCALE_TO_CM = 600.0 / 1114.0;
+const double SCALE_TO_PX = 1114.0 * 100 / 600.0;
+const double SCALE_TO_M = 600.0 / (1114.0 * 100);
 
 /**
  * generates a force map like in the paper:
@@ -32,7 +32,7 @@ private:
 	Mat m_oImage;
 	Mat2d m_oForceMap;
 	Mat2d m_oDistanceMap;
-	const double EXP_CONST = 10 * SCALE_TO_PX * 100;
+	const double EXP_CONST = 10;
 
 
 	// private methods
@@ -63,11 +63,12 @@ private:
 					double fDividentSum = 0;
 					for (int nCont = 0; nCont < contours.size(); nCont++)
 					{
+						// pixel distance
 						double fDistance = fabs(pointPolygonTest(contours[nCont], Point2d(nCol, nRow), true));
-						fDividentSum += exp(-fDistance / EXP_CONST);
+						fDividentSum += exp(-fDistance * SCALE_TO_M / EXP_CONST);
 					}
 					double fDistanceOuter = fabs(pointPolygonTest(contours[nContOuter], Point2d(nCol, nRow), true));
-					double fWeight = exp(fDistanceOuter / EXP_CONST) / fDividentSum;
+					double fWeight = exp(fDistanceOuter * SCALE_TO_M / EXP_CONST) / fDividentSum;
 					oWeightMap.at<double>(nCol, nRow, nContOuter) = fWeight;
 				}
 			}
@@ -98,10 +99,11 @@ private:
 						if (fDist < fMinDistance)
 						{
 							fMinDistance = fDist;
-							oMinVector = Point2d(contours[nCont][nPixelCount] - Point(nRow, nCol));
+							oMinVector = Point2d(6,6) - Point2d(contours[nCont][nPixelCount] - Point(nRow, nCol)) *  SCALE_TO_M;
+							oMinVector = Point2d(oMinVector.y, oMinVector.x);
 						}
 					}
-					if (GetDistance(Point2d(0,0), oMinVector) < GetDistance(Point2d(0,0), m_oDistanceMap[nCol][nRow]))
+					if (GetVectorLength(oMinVector) < GetVectorLength(m_oDistanceMap[nCol][nRow]))
 						m_oDistanceMap[nCol][nRow] = oMinVector;
 					oForceVector += oWeightMap.at<double>(nCol , nRow, nCont) * oMinVector ;
 				}
@@ -112,11 +114,16 @@ private:
 		}
 	}
 
-	double GetDistance(Point oP1, Point oP2)
+	// convenience functions
+	static double GetVectorLength(Point2d oVec)
+	{
+		return GetDistance(Point2d(0,0), oVec);
+	}
+	static double GetDistance(Point oP1, Point oP2)
 	{
 		return sqrt(pow(oP1.x - oP2.x, 2) + pow(oP1.y - oP2.y, 2));
 	}
-	double GetDistance(Point2d oP1, Point2d oP2)
+	static double GetDistance(Point2d oP1, Point2d oP2)
 	{
 		return sqrt(pow(oP1.x - oP2.x, 2) + pow(oP1.y - oP2.y, 2));
 	}
