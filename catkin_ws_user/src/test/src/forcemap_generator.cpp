@@ -18,10 +18,6 @@
 using namespace cv;
 using namespace std;
 
-const double SCALE_TO_PX = 1114.0 * 100 / 600.0;
-const double SCALE_TO_M = 600.0 / (1114.0 * 100);
-const Size MAP_SIZE = Size(80 - 1, 120 - 1);
-
 /**
  * generates a force map like in the paper:
  * http://page.mi.fu-berlin.de/rojas/2003/matrix.pdf
@@ -50,8 +46,6 @@ private:
 		Rect roi(m_oImage.cols / 2, m_oImage.rows / 2, m_oImage.cols, m_oImage.rows);
 		m_oImage.copyTo(oWorkingMat(roi));
 
-		int nStartingOffset = 0.1/*m*/ * SCALE_TO_PX / 2;
-
 		// create empty forcemap and distancemap
 		m_oForceMap = Mat2d::zeros(MAP_SIZE.height, MAP_SIZE.width);
 		m_oDistanceMap = Mat2d::zeros(MAP_SIZE.height, MAP_SIZE.width);
@@ -65,6 +59,7 @@ private:
 		int aSizes[] = {MAP_SIZE.width, MAP_SIZE.height, contours.size()};
 		Mat oWeightMap(3, aSizes, CV_64FC1, Scalar(0));
 
+		int nStartingOffset = 0.1/*m*/ * SCALE_TO_PX / 2;
 		// the following for loops calculate the weights as in the paper on p.5
 		for (int y = 0; y < MAP_SIZE.height; y++)
 		{
@@ -134,6 +129,22 @@ private:
 				cout << "oDistanceVector" << "[" << x << "][" << y << "]:\t" << m_oDistanceMap[x][y] << endl;
 			}
 		}
+
+		double fLongestDistance = 0;
+		double fLargestForce = 0;
+		// normalize the vectors to the length of the longest one
+		for (int y = 0; y < MAP_SIZE.height; y++)
+		{
+			for (int x = 0; x < MAP_SIZE.width; x++)
+			{
+				if (GetVectorLength(m_oForceMap[x][y]) > fLargestForce)
+					fLargestForce = GetVectorLength(m_oForceMap[x][y]);
+				if (GetVectorLength(m_oDistanceMap[x][y]) > fLongestDistance)
+					fLongestDistance = GetVectorLength(m_oDistanceMap[x][y]);
+			}
+		}
+		m_oForceMap /= fLargestForce;
+		m_oDistanceMap /= fLongestDistance;
 	}
 
 public:
