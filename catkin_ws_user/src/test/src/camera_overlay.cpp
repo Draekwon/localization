@@ -33,6 +33,8 @@
 #include "opencv2/highgui/highgui.hpp"
 #include "opencv2/xfeatures2d.hpp"
 
+#include "utility.h"
+
 using namespace std;
 using namespace cv;
 using namespace cv::xfeatures2d;
@@ -198,20 +200,6 @@ public:
 		oForceVector /= counter == 0 ? 1 : counter;
 
 		return oForceVector;
-	}
-
-	// convenience functions
-	static double GetVectorLength(Point2d oVec)
-	{
-		return GetDistance(Point2d(0,0), oVec);
-	}
-	static double GetDistance(Point oP1, Point oP2)
-	{
-		return sqrt(pow(oP1.x - oP2.x, 2) + pow(oP1.y - oP2.y, 2));
-	}
-	static double GetDistance(Point2d oP1, Point2d oP2)
-	{
-		return sqrt(pow(oP1.x - oP2.x, 2) + pow(oP1.y - oP2.y, 2));
 	}
 
 	void ImageCallback(const sensor_msgs::ImageConstPtr& msg)

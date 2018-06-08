@@ -13,11 +13,14 @@
 #include "opencv2/highgui.hpp"
 #include "opencv2/imgproc.hpp"
 
+#include "utility.h"
+
 using namespace cv;
 using namespace std;
 
 const double SCALE_TO_PX = 1114.0 * 100 / 600.0;
 const double SCALE_TO_M = 600.0 / (1114.0 * 100);
+const Size MAP_SIZE = Size(80 - 1, 120 - 1);
 
 /**
  * generates a force map like in the paper:
@@ -28,7 +31,6 @@ class CForceMapGenerator
 {
 private:
 	// class vars
-
 	Mat m_oImage;
 	Mat2d m_oForceMap;
 	Mat2d m_oDistanceMap;
@@ -39,24 +41,39 @@ private:
 
 	void CreateForceMap()
 	{
-		// create empty forcemap
-		m_oForceMap = Mat2d::zeros(m_oImage.size());
-		m_oDistanceMap = Mat2d::zeros(m_oImage.size());
+		// border for map border
+		Rect border(Point(0,0), m_oImage.size());
+		rectangle(m_oImage, border, Scalar(255));
+
+		// make bigger mat and put map in the center of it
+		Mat oWorkingMat = Mat::zeros(m_oImage.size() * 2, CV_8UC1);
+		Rect roi(m_oImage.cols / 2, m_oImage.rows / 2, m_oImage.cols, m_oImage.rows);
+		m_oImage.copyTo(oWorkingMat(roi));
+
+		int nStartingOffset = 0.1/*m*/ * SCALE_TO_PX / 2;
+
+		// create empty forcemap and distancemap
+		m_oForceMap = Mat2d::zeros(MAP_SIZE);
+		m_oDistanceMap = Mat2d::zeros(MAP_SIZE);
 
 		// get the contours
 		vector<vector<Point> > contours;
 		vector<Vec4i> hierarchy;
-		findContours( m_oImage, contours, hierarchy, RETR_EXTERNAL, CHAIN_APPROX_NONE, Point(0, 0) );
+		findContours( oWorkingMat, contours, hierarchy, RETR_EXTERNAL, CHAIN_APPROX_NONE, Point(0, 0) );
 		cout << "contour count: " << contours.size() << endl;
 		// create empty weight map
-		int aSizes[] = {m_oImage.cols, m_oImage.rows, contours.size()};
+		int aSizes[] = {MAP_SIZE.width, MAP_SIZE.height, contours.size()};
 		Mat oWeightMap(3, aSizes, CV_64FC1, Scalar(0));
 
 		// the following for loops calculate the weights as in the paper on p.5
-		for (int nRow = 0; nRow < m_oImage.rows; nRow++)
+		for (int y = 0; y < MAP_SIZE.height; y++)
 		{
-			for (int nCol = 0; nCol < m_oImage.cols; nCol++)
+			// nRow, nCol are pixel coordinate on scaled WorkingMat
+			int nRow = nStartingOffset + (int)(0.1 * SCALE_TO_PX * y);
+			for (int x = 0; x < MAP_SIZE.width; x++)
 			{
+				int nCol = nStartingOffset + (int)(0.1 * SCALE_TO_PX * x);
+
 				// get distances to every contour and sum them up
 				for (int nContOuter = 0; nContOuter < contours.size(); nContOuter++)
 				{
@@ -69,19 +86,24 @@ private:
 					}
 					double fDistanceOuter = fabs(pointPolygonTest(contours[nContOuter], Point2d(nCol, nRow), true));
 					double fWeight = exp(fDistanceOuter * SCALE_TO_M / EXP_CONST) / fDividentSum;
-					oWeightMap.at<double>(nCol, nRow, nContOuter) = fWeight;
+					oWeightMap.at<double>(x, y, nContOuter) = fWeight;
 				}
 			}
 			cout << "(nRow): (" << nRow << ")" << endl;
 		}
 
 		// these loops calculate the actual force vectors as in the paper p.5
-		for (int nRow = 0; nRow < m_oImage.rows; nRow++)
+		for (int y = 0; y < MAP_SIZE.height; y++)
 		{
-			for (int nCol = 0; nCol < m_oImage.cols; nCol++)
+			// nRow, nCol are pixel coordinate on scaled WorkingMat
+			int nRow = nStartingOffset + (int)(0.1 * SCALE_TO_PX * y);
+			for (int x = 0; x < MAP_SIZE.width; x++)
 			{
+				int nCol = nStartingOffset + (int)(0.1 * SCALE_TO_PX * x);
 
-				m_oDistanceMap[nCol][nRow] = Point2d(20000,20000);
+				// initialize distancemap with too high value for the comparison later
+				// this is kind of a hack :-/
+				m_oDistanceMap[x][y] = Point2d(20000,20000);
 				Point2d oForceVector(0,0);
 				// brute-force-find the closest point / shortest vector of a contour:
 				// iterate through contours
@@ -99,33 +121,20 @@ private:
 						if (fDist < fMinDistance)
 						{
 							fMinDistance = fDist;
-							oMinVector = Point2d(6,6) - Point2d(contours[nCont][nPixelCount] - Point(nRow, nCol)) *  SCALE_TO_M;
-							oMinVector = Point2d(oMinVector.y, oMinVector.x);
+							oMinVector = Point2d(contours[nCont][nPixelCount] - Point(nRow, nCol)) *  SCALE_TO_M;
+							oMinVector = Point2d(-oMinVector.y, -oMinVector.x);
 						}
 					}
-					if (GetVectorLength(oMinVector) < GetVectorLength(m_oDistanceMap[nCol][nRow]))
-						m_oDistanceMap[nCol][nRow] = oMinVector;
-					oForceVector += oWeightMap.at<double>(nCol , nRow, nCont) * oMinVector ;
+					if (GetVectorLength(oMinVector) < GetVectorLength(m_oDistanceMap[x][y]))
+						m_oDistanceMap[x][y] = oMinVector;
+					oForceVector += oWeightMap.at<double>(x , y, nCont) * oMinVector ;
 				}
 
-				m_oForceMap[nCol][nRow] = oForceVector;
-				cout << "oForceVector: " << m_oForceMap[nCol][nRow] << endl;
+				m_oForceMap[x][y] = oForceVector;
+				cout << "oForceVector: " << m_oForceMap[x][y] << endl;
+				cout << "oDistanceVector: " << m_oDistanceMap[x][y] << endl;
 			}
 		}
-	}
-
-	// convenience functions
-	static double GetVectorLength(Point2d oVec)
-	{
-		return GetDistance(Point2d(0,0), oVec);
-	}
-	static double GetDistance(Point oP1, Point oP2)
-	{
-		return sqrt(pow(oP1.x - oP2.x, 2) + pow(oP1.y - oP2.y, 2));
-	}
-	static double GetDistance(Point2d oP1, Point2d oP2)
-	{
-		return sqrt(pow(oP1.x - oP2.x, 2) + pow(oP1.y - oP2.y, 2));
 	}
 
 public:
@@ -152,7 +161,7 @@ public:
 	{
 		if (oDistanceMap.empty())
 		{
-			cerr << "No ForceMap supplied ..." << endl;
+			cerr << "No DistanceMap supplied ..." << endl;
 			return;
 		}
 		FileStorage file(sFilename, FileStorage::WRITE, "UTF-8");
@@ -189,12 +198,6 @@ int main(int argc, char **argv)
 
 	CForceMapGenerator::SaveDistanceMapToFile("../../../distancemap.xml", oForceMapGenerator.GetDistanceMap());
 	CForceMapGenerator::SaveForceMapToFile("../../../forcemap.xml", oForceMapGenerator.GetForceMap());
-
-	FileStorage file("../../../forcemap.xml", FileStorage::READ, "UTF-8");
-	Mat oForceMap;
-	file["ForceMap"] >> oForceMap;
-	file.release();
-	cout << "forcemap size " << oForceMap.size();
 
 	return(0);
 }
