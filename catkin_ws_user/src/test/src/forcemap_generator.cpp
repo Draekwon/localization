@@ -53,8 +53,8 @@ private:
 		int nStartingOffset = 0.1/*m*/ * SCALE_TO_PX / 2;
 
 		// create empty forcemap and distancemap
-		m_oForceMap = Mat2d::zeros(MAP_SIZE);
-		m_oDistanceMap = Mat2d::zeros(MAP_SIZE);
+		m_oForceMap = Mat2d::zeros(MAP_SIZE.height, MAP_SIZE.width);
+		m_oDistanceMap = Mat2d::zeros(MAP_SIZE.height, MAP_SIZE.width);
 
 		// get the contours
 		vector<vector<Point> > contours;
@@ -129,10 +129,9 @@ private:
 						m_oDistanceMap[x][y] = oMinVector;
 					oForceVector += oWeightMap.at<double>(x , y, nCont) * oMinVector ;
 				}
-
 				m_oForceMap[x][y] = oForceVector;
-				cout << "oForceVector: " << m_oForceMap[x][y] << endl;
-				cout << "oDistanceVector: " << m_oDistanceMap[x][y] << endl;
+				cout << "oForceVector" << "[" << x << "][" << y << "]:\t" << m_oForceMap[x][y] << endl;
+				cout << "oDistanceVector" << "[" << x << "][" << y << "]:\t" << m_oDistanceMap[x][y] << endl;
 			}
 		}
 	}
