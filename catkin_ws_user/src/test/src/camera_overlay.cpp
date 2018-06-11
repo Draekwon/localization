@@ -51,7 +51,9 @@ class CCameraOverlay
 	ros::NodeHandle m_oNodeHandle;
 	image_transport::ImageTransport m_oImgTransport;
 	image_transport::Subscriber m_oImageSub;
+	image_transport::Publisher m_oImagePub;
 	ros::Publisher m_oOdomPub;
+
 	geometry_msgs::Pose m_oOdomPose;
 	geometry_msgs::Pose m_oOldOdomPose;
 	geometry_msgs::Pose m_oCurrentPose;
@@ -93,6 +95,7 @@ public:
 
 		// publish a position by publishing odometry
 		m_oOdomPub = m_oNodeHandle.advertise<nav_msgs::Odometry>("MATRIX_Location", 50);
+		m_oImagePub = m_oImgTransport.advertise("/camera_overlay", 1);
 
 		// Subscribe to input video feed
 		m_oImageSub = m_oImgTransport.subscribe("/usb_cam/image_undistorted", 1,
@@ -111,9 +114,10 @@ public:
 		m_oOdomPose = msg->pose.pose;
 	}
 
-	Point2d GetForceVector(Mat oRotatedImg, Point3d oOdomPos)
+	Point2d GetForceVector(Mat oRotatedImg, Point3d oOdomPos, double &oTorque)
 	{
 		Point3d tempPoint = Point3d(6, 4, 0) - oOdomPos;
+		cout << "tempPoint: " << tempPoint << endl;
 		tempPoint *= SCALE_TO_PX;
 		Point oCenter = Point(tempPoint.y, tempPoint.x);
 
@@ -135,6 +139,10 @@ public:
 
 		Point oCroppedTopLeft(oTopLeft.x + nCroppedX, oTopLeft.y + nCroppedY);
 
+//		// publish the overlay to double check rotation and stuff
+//		Rect oRegionOfInterest = Rect(oCroppedTopLeft, oCroppedRotatedImage.size());
+//		PublishCroppedRotatedImage(oCroppedRotatedImage, oRegionOfInterest, oCenter);
+
 		const double fMapUnit = 0.1/*10 cm*/ * SCALE_TO_PX;
 
 		// its complicated...
@@ -149,7 +157,7 @@ public:
 			(nStartingOffsetX + 1) * fMapUnit + fMapUnit / 2 :
 			nStartingOffsetX * fMapUnit + fMapUnit / 2;
 		int nStartingOffsetY = oCroppedTopLeft.y / fMapUnit;
-		nStartingOffsetY = nStartingOffsetY * fMapUnit + fMapUnit / 2 < oCroppedTopLeft.Y ?
+		nStartingOffsetY = nStartingOffsetY * fMapUnit + fMapUnit / 2 < oCroppedTopLeft.y ?
 			(nStartingOffsetY + 1) * fMapUnit + fMapUnit / 2 :
 			nStartingOffsetY * fMapUnit + fMapUnit / 2;
 
@@ -166,22 +174,47 @@ public:
 					int y = (nRow + oCroppedTopLeft.y) / (fMapUnit);
 					counter++;
 //					cout << "[x,y]: " << x << " " << y << endl;
-					oForceVector += m_oForceMap.at<Point2d>(x, y);
+					oForceVector += m_oDistanceMap.at<Point2d>(x, y);
+					Point2d distanceVec = Point2d(nCol - oCenter.x, nRow - oCenter.y);
+					oTorque += distanceVec.cross(oForceVector);
 				}
 			}
 		}
 //		cout << "counter: " << counter << endl;
 		oForceVector /= counter == 0 ? 1 : counter;
+		oTorque /= counter == 0 ? 1 : counter;
 
 		return oForceVector;
 	}
 
+	void PublishCroppedRotatedImage(Mat oCroppedImg, Rect roi, Point2d oCenter)
+	{
+		Mat oMapImg = Mat::zeros(m_oMapImg.size() * 2, CV_8UC1);
+		m_oMapImg.copyTo(oMapImg(Rect(oMapImg.size() / 4, m_oMapImg.size())));
+		roi.x += oMapImg.cols / 4;
+		roi.y += oMapImg.rows / 4;
+		oCenter.x += oMapImg.cols / 4;
+		oCenter.y += oMapImg.rows / 4;
+		Mat oDestinationRoi = oMapImg(roi);
+		oCroppedImg.copyTo(oDestinationRoi, oCroppedImg);
+		cv::circle(oMapImg, oCenter, 10, 255, -1);
+
+		sensor_msgs::ImagePtr oPubMsg = cv_bridge::CvImage(std_msgs::Header(),
+				sensor_msgs::image_encodings::MONO8, /*oContourImg*/oMapImg).toImageMsg();
+		// Output modified video stream
+		m_oImagePub.publish(oPubMsg);
+	}
+
 	Mat GetRotatedImg(Mat oContourImg, double fYaw)
 	{
-	    Point2d oImageCenter((oContourImg.cols - 1) / 2.0, (oContourImg.rows - 1) / 2.0);
+		// I have no idea why the following should be necessary...
+		fYaw = fYaw * 180 / M_PI - 180;
+		// what this does is, it converts from radians to degrees and then switches front and back.
+
+	    Point2f oImageCenter((oContourImg.cols - 1) / 2.0, (oContourImg.rows - 1) / 2.0);
 	    Mat oRotMat = getRotationMatrix2D(oImageCenter, fYaw, 1.0);
 
-	    Rect2d oBoundingBox = RotatedRect(oImageCenter, oContourImg.size(), fYaw).boundingRect2f();
+	    Rect2f oBoundingBox = RotatedRect(oImageCenter, oContourImg.size(), fYaw).boundingRect2f();
 	    oRotMat.at<double>(0,2) += oBoundingBox.width / 2.0 - oContourImg.cols / 2.0;
 	    oRotMat.at<double>(1,2) += oBoundingBox.height / 2.0 - oContourImg.rows / 2.0;
 
@@ -245,10 +278,12 @@ public:
 		Point3d oCurrentPosePosition(m_oCurrentPose.position.x, m_oCurrentPose.position.y, m_oCurrentPose.position.z);
 		Point3d oPosition = oCurrentPosePosition + oOdomPosePosition - oOldOdomPosePosition;
 		try {
+			double oTorque = 0;
 			Mat oRotatedImg = GetRotatedImg(oBlurredImg, fDifferentialYaw);
-			Point2d oForceVector = GetForceVector(oRotatedImg, oPosition);
+			Point2d oForceVector = GetForceVector(oRotatedImg, oPosition, oTorque);
 
-			cout << "forcevector1 " << GetVectorLength(oForceVector) << endl;
+
+			cout << "oTorque " << oTorque << endl;
 			// force vectors are scaled, so that the longest one is 1m
 			// scale them down so that the longest is 1cm
 			oForceVector *= 0.01;
