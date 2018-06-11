@@ -133,18 +133,37 @@ public:
 		Rect oCropRoi(nCroppedX, nCroppedY, nCroppedWidth, nCroppedHeight);
 		Mat oCroppedRotatedImage = oRotatedImg(oCropRoi);
 
-		const int nStartingOffset = 0.1/*m*/ * SCALE_TO_PX / 2;
+		Point oCroppedTopLeft(oTopLeft.x + nCroppedX, oTopLeft.y + nCroppedY);
+
+		const double fMapUnit = 0.1/*10 cm*/ * SCALE_TO_PX;
+
+		// its complicated...
+		// if (cutoff) map index * unit size + half unit size is outside the rotated image rect,
+		// add 1.
+		// example: 186 / 100 = 1.86; cutoff = 1, 
+		// add half unit size = 1 * unit size + unit size /2 = 150
+		// which is smaller than 186, so add one to the unit count:
+		// 2 * unit size + 0.5 * unit size = 250, which is bigger than 186.
+		int nStartingOffsetX = oCroppedTopLeft.x / fMapUnit;
+		nStartingOffsetX = nStartingOffsetX * fMapUnit + fMapUnit / 2 < oCroppedTopLeft.x ?
+			(nStartingOffsetX + 1) * fMapUnit + fMapUnit / 2 :
+			nStartingOffsetX * fMapUnit + fMapUnit / 2;
+		int nStartingOffsetY = oCroppedTopLeft.y / fMapUnit;
+		nStartingOffsetY = nStartingOffsetY * fMapUnit + fMapUnit / 2 < oCroppedTopLeft.Y ?
+			(nStartingOffsetY + 1) * fMapUnit + fMapUnit / 2 :
+			nStartingOffsetY * fMapUnit + fMapUnit / 2;
+
 		Point2d oForceVector(0,0);
 		int counter = 0;
-		for (int nCol = nStartingOffset; nCol < oCroppedRotatedImage.cols; nCol += 0.1 * SCALE_TO_PX)
+		for (int nCol = nStartingOffsetX; nCol < oCroppedRotatedImage.cols; nCol += fMapUnit)
 		{
-			for (int nRow = nStartingOffset; nRow < oCroppedRotatedImage.rows; nRow += 0.1 * SCALE_TO_PX)
+			for (int nRow = nStartingOffsetY; nRow < oCroppedRotatedImage.rows; nRow += fMapUnit)
 			{
 				if (oCroppedRotatedImage.at<int>(nCol, nRow) > 128)
 				{
-					// convert to unscaled image pixel
-					int x = (nCol + oTopLeft.x) / (0.1 * SCALE_TO_PX);
-					int y = (nRow + oTopLeft.y) / (0.1 * SCALE_TO_PX);
+					// convert to map units
+					int x = (nCol + oCroppedTopLeft.x) / (fMapUnit);
+					int y = (nRow + oCroppedTopLeft.y) / (fMapUnit);
 					counter++;
 //					cout << "[x,y]: " << x << " " << y << endl;
 					oForceVector += m_oForceMap.at<Point2d>(x, y);
@@ -210,6 +229,7 @@ public:
 		}
 
 		// blur for making getting more accurate force vectors easier
+		// kind of a hack I guess
 		Mat oBlurredImg = Mat::zeros(oContourImg.size(), CV_8UC1);
 		blur(oContourImg, oBlurredImg, Size(5,5));
 
@@ -229,8 +249,8 @@ public:
 			Point2d oForceVector = GetForceVector(oRotatedImg, oPosition);
 
 			cout << "forcevector1 " << GetVectorLength(oForceVector) << endl;
-			// scale vector to 5 cm
-//			oForceVector /= (GetVectorLength(oForceVector) == 0 ? 1 : GetVectorLength(oForceVector));
+			// force vectors are scaled, so that the longest one is 1m
+			// scale them down so that the longest is 1cm
 			oForceVector *= 0.01;
 			cout << "forcevector2 " << GetVectorLength(oForceVector) << endl;
 			// add the force vector to the position

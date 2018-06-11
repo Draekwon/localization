@@ -122,7 +122,7 @@ private:
 					}
 					if (GetVectorLength(oMinVector) < GetVectorLength(m_oDistanceMap[x][y]))
 						m_oDistanceMap[x][y] = oMinVector;
-					oForceVector += oWeightMap.at<double>(x , y, nCont) * oMinVector ;
+					oForceVector += oWeightMap.at<double>(x, y, nCont) * oMinVector ;
 				}
 				m_oForceMap[x][y] = oForceVector;
 				cout << "oForceVector" << "[" << x << "][" << y << "]:\t" << m_oForceMap[x][y] << endl;
