@@ -152,20 +152,20 @@ public:
 		// add half unit size = 1 * unit size + unit size /2 = 150
 		// which is smaller than 186, so add one to the unit count:
 		// 2 * unit size + 0.5 * unit size = 250, which is bigger than 186.
-		int nStartingOffsetX = oCroppedTopLeft.x / fMapUnit;
-		nStartingOffsetX = nStartingOffsetX * fMapUnit + fMapUnit / 2 < oCroppedTopLeft.x ?
-			(nStartingOffsetX + 1) * fMapUnit + fMapUnit / 2 :
-			nStartingOffsetX * fMapUnit + fMapUnit / 2;
-		int nStartingOffsetY = oCroppedTopLeft.y / fMapUnit;
-		nStartingOffsetY = nStartingOffsetY * fMapUnit + fMapUnit / 2 < oCroppedTopLeft.y ?
-			(nStartingOffsetY + 1) * fMapUnit + fMapUnit / 2 :
-			nStartingOffsetY * fMapUnit + fMapUnit / 2;
+		int nStartingOffsetX = round(oCroppedTopLeft.x / fMapUnit);
+//		nStartingOffsetX = nStartingOffsetX * fMapUnit + fMapUnit / 2 < oCroppedTopLeft.x ?
+//			(nStartingOffsetX + 1) * fMapUnit + fMapUnit / 2 :
+//			nStartingOffsetX * fMapUnit + fMapUnit / 2;
+		int nStartingOffsetY = round(oCroppedTopLeft.y / fMapUnit);
+//		nStartingOffsetY = nStartingOffsetY * fMapUnit + fMapUnit / 2 < oCroppedTopLeft.y ?
+//			(nStartingOffsetY + 1) * fMapUnit + fMapUnit / 2 :
+//			nStartingOffsetY * fMapUnit + fMapUnit / 2;
 
 		Point2d oForceVector(0,0);
 		int counter = 0;
-		for (int nCol = nStartingOffsetX; nCol < oCroppedRotatedImage.cols; nCol += fMapUnit)
+		for (int nCol = nStartingOffsetX; nCol < oCroppedRotatedImage.cols; nCol++ /*fMapUnit*/)
 		{
-			for (int nRow = nStartingOffsetY; nRow < oCroppedRotatedImage.rows; nRow += fMapUnit)
+			for (int nRow = nStartingOffsetY; nRow < oCroppedRotatedImage.rows; nRow++ /*fMapUnit*/)
 			{
 				if (oCroppedRotatedImage.at<int>(nCol, nRow) > 128)
 				{
@@ -263,8 +263,8 @@ public:
 
 		// blur for making getting more accurate force vectors easier
 		// kind of a hack I guess
-		Mat oBlurredImg = Mat::zeros(oContourImg.size(), CV_8UC1);
-		blur(oContourImg, oBlurredImg, Size(5,5));
+//		Mat oBlurredImg = Mat::zeros(oContourImg.size(), CV_8UC1);
+//		blur(oContourImg, oBlurredImg, Size(5,5));
 
 		// this should basically be the odometry of the car
 		double fOdomYaw = tf::getYaw(m_oOdomPose.orientation);
@@ -279,7 +279,7 @@ public:
 		Point3d oPosition = oCurrentPosePosition + oOdomPosePosition - oOldOdomPosePosition;
 		try {
 			double oTorque = 0;
-			Mat oRotatedImg = GetRotatedImg(oBlurredImg, fDifferentialYaw);
+			Mat oRotatedImg = GetRotatedImg(oContourImg, fDifferentialYaw);
 			Point2d oForceVector = GetForceVector(oRotatedImg, oPosition, oTorque);
 
 
