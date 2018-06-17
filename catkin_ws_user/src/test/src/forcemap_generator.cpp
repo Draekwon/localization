@@ -53,7 +53,22 @@ private:
 		// get the contours
 		vector<vector<Point> > contours;
 		vector<Vec4i> hierarchy;
-		findContours( oWorkingMat, contours, hierarchy, RETR_EXTERNAL, CHAIN_APPROX_NONE, Point(0, 0) );
+		findContours( oWorkingMat, contours, hierarchy, CV_RETR_LIST, CHAIN_APPROX_NONE, Point(0, 0) );
+
+	    Mat oContourImg = Mat::zeros( oWorkingMat.size(), CV_8UC1);
+		for( size_t i = 0; i< contours.size(); i++ )
+		{
+			cout << "i: " << i << " contours[i]:" << endl << contours[i] << endl << endl;
+			Scalar color = Scalar( 255 );
+			drawContours( oContourImg, contours, (int)i, color, 1, 8, hierarchy, 0, Point() );
+		}
+		namedWindow("kek", WINDOW_NORMAL);
+		imshow("kek", oWorkingMat);
+		waitKey(0);
+		imshow("kek", oContourImg);
+		waitKey(0);
+//		return;
+
 		cout << "contour count: " << contours.size() << endl;
 		// create empty weight map
 		int aSizes[] = {MAP_SIZE.width, MAP_SIZE.height, contours.size()};
@@ -61,31 +76,36 @@ private:
 
 		int nStartingOffset = 0.1/*m*/ * SCALE_TO_PX / 2;
 		// the following for loops calculate the weights as in the paper on p.5
-		for (int y = 0; y < MAP_SIZE.height; y++)
-		{
-			// nRow, nCol are pixel coordinate on scaled WorkingMat
-			int nRow = nStartingOffset + (int)(0.1 * SCALE_TO_PX * y);
-			for (int x = 0; x < MAP_SIZE.width; x++)
-			{
-				int nCol = nStartingOffset + (int)(0.1 * SCALE_TO_PX * x);
+//		for (int y = 0; y < MAP_SIZE.height; y++)
+//		{
+//			// nRow, nCol are pixel coordinate on scaled WorkingMat
+//			int nRow = nStartingOffset + (int)(0.1 * SCALE_TO_PX * y);
+//			for (int x = 0; x < MAP_SIZE.width; x++)
+//			{
+//				int nCol = nStartingOffset + (int)(0.1 * SCALE_TO_PX * x);
+//
+//				// get distances to every contour and sum them up
+//				for (int nContOuter = 0; nContOuter < contours.size(); nContOuter++)
+//				{
+//					double fDividentSum = 0;
+//					for (int nCont = 0; nCont < contours.size(); nCont++)
+//					{
+//						// pixel distance
+//						double fDistance = fabs(pointPolygonTest(contours[nCont], Point2d(nCol, nRow), true));
+//						fDividentSum += exp(-fDistance * SCALE_TO_M / EXP_CONST);
+//					}
+//					double fDistanceOuter = fabs(pointPolygonTest(contours[nContOuter], Point2d(nCol, nRow), true));
+//					double fWeight = exp(fDistanceOuter * SCALE_TO_M / EXP_CONST) / fDividentSum;
+//					oWeightMap.at<double>(x, y, nContOuter) = fWeight;
+//				}
+//			}
+//			cout << "(nRow): (" << nRow << ")" << endl;
+//		}
 
-				// get distances to every contour and sum them up
-				for (int nContOuter = 0; nContOuter < contours.size(); nContOuter++)
-				{
-					double fDividentSum = 0;
-					for (int nCont = 0; nCont < contours.size(); nCont++)
-					{
-						// pixel distance
-						double fDistance = fabs(pointPolygonTest(contours[nCont], Point2d(nCol, nRow), true));
-						fDividentSum += exp(-fDistance * SCALE_TO_M / EXP_CONST);
-					}
-					double fDistanceOuter = fabs(pointPolygonTest(contours[nContOuter], Point2d(nCol, nRow), true));
-					double fWeight = exp(fDistanceOuter * SCALE_TO_M / EXP_CONST) / fDividentSum;
-					oWeightMap.at<double>(x, y, nContOuter) = fWeight;
-				}
-			}
-			cout << "(nRow): (" << nRow << ")" << endl;
-		}
+		// for visualization
+		namedWindow("DistanceMapDrawing", WINDOW_NORMAL);
+		RNG rng;
+		Mat oDrawMat = Mat::zeros(MAP_SIZE.width * 101, MAP_SIZE.height * 101, CV_8UC3);
 
 		// these loops calculate the actual force vectors as in the paper p.5
 		for (int y = 0; y < MAP_SIZE.height; y++)
@@ -117,16 +137,26 @@ private:
 						{
 							fMinDistance = fDist;
 							oMinVector = Point2d(contours[nCont][nPixelCount] - Point(nRow, nCol)) *  SCALE_TO_M;
-							oMinVector = Point2d(-oMinVector.y, -oMinVector.x);
+//							oMinVector = Point2d(-oMinVector.y, -oMinVector.x);
 						}
 					}
 					if (GetVectorLength(oMinVector) < GetVectorLength(m_oDistanceMap[x][y]))
+					{
 						m_oDistanceMap[x][y] = oMinVector;
-					oForceVector += oWeightMap.at<double>(x, y, nCont) * oMinVector ;
+					}
+//					oForceVector += oWeightMap.at<double>(x, y, nCont) * oMinVector;
 				}
-				m_oForceMap[x][y] = oForceVector;
-				cout << "oForceVector" << "[" << x << "][" << y << "]:\t" << m_oForceMap[x][y] << endl;
+//				m_oForceMap[x][y] = oForceVector;
+//				cout << "oForceVector" << "[" << x << "][" << y << "]:\t" << m_oForceMap[x][y] << endl;
 				cout << "oDistanceVector" << "[" << x << "][" << y << "]:\t" << m_oDistanceMap[x][y] << endl;
+
+//				// visualization
+//				Point oCoordinate(50 + x * 100, 50 + y * 100);
+//				Point2d oDistVec = m_oDistanceMap[x][y] * 75 / GetVectorLength(m_oDistanceMap[x][y]);
+//				Scalar color = Scalar(rng.uniform(0,255), rng.uniform(0,255), rng.uniform(0,255));
+//				arrowedLine(oDrawMat, oCoordinate, oCoordinate+Point(oDistVec), color, 5, LINE_AA);
+//				imshow("DistanceMapDrawing", oDrawMat);
+//				waitKey(3);
 			}
 		}
 
@@ -193,7 +223,64 @@ public:
 
 };
 
+void DrawForceMap()
+{
+	Mat oForceMap;
+	cv::FileStorage fs("../../../forcemap.xml", cv::FileStorage::READ);
+	fs["ForceMap"] >> oForceMap;
 
+	RNG rng;
+
+	Mat oDrawMat = Mat::zeros(oForceMap.rows * 101, oForceMap.cols * 101, CV_8UC3);
+	cout << oDrawMat.size << endl;
+	for (int nFMapCol = 0; nFMapCol < oForceMap.cols; nFMapCol++)
+	{
+		int nDMatCol = 50 + nFMapCol * 100;
+		for (int nFMapRow = 0; nFMapRow < oForceMap.rows; nFMapRow++)
+		{
+			int nDMatRow = 50 + nFMapRow * 100;
+
+			Point2d oForceVector = oForceMap.at<Point2d>(nFMapCol, nFMapRow);
+			oForceVector = oForceVector * 75 / GetVectorLength(oForceVector);
+			Scalar color = Scalar(rng.uniform(0,255), rng.uniform(0,255), rng.uniform(0,255));
+			Point oCoordinate(nDMatCol, nDMatRow);
+			arrowedLine(oDrawMat, oCoordinate, oCoordinate+Point(oForceVector), color, 5, LINE_AA);
+		}
+	}
+	namedWindow("ForceMap", WINDOW_NORMAL);
+	imshow("ForceMap", oDrawMat);
+	waitKey(0);
+
+}
+
+void DrawDistanceMap()
+{
+	Mat oDistanceMap;
+	cv::FileStorage fs2("../../../distancemap.xml", cv::FileStorage::READ);
+	fs2["DistanceMap"] >> oDistanceMap;
+
+	RNG rng;
+
+	Mat oDrawMat = Mat::zeros(oDistanceMap.rows * 101, oDistanceMap.cols * 101, CV_8UC3);
+	cout << oDrawMat.size << endl;
+	for (int nDMapCol = 0; nDMapCol < oDistanceMap.cols; nDMapCol++)
+	{
+		int nDrawMatCol = 50 + nDMapCol * 100;
+		for (int nDMapRow = 0; nDMapRow < oDistanceMap.rows; nDMapRow++)
+		{
+			int nDrawMatRow = 50 + nDMapRow * 100;
+
+			Point2d oDistVector = oDistanceMap.at<Point2d>(nDMapCol, nDMapRow);
+			oDistVector = oDistVector * 75 / GetVectorLength(oDistVector);
+			Scalar color = Scalar(rng.uniform(0,255), rng.uniform(0,255), rng.uniform(0,255));
+			Point oCoordinate(nDrawMatCol, nDrawMatRow);
+			arrowedLine(oDrawMat, oCoordinate, oCoordinate+Point(oDistVector), color, 1, LINE_AA);
+		}
+	}
+	namedWindow("DistanceMap", WINDOW_NORMAL);
+	imshow("DistanceMap", oDrawMat);
+	waitKey(0);
+}
 
 int main(int argc, char **argv)
 {
@@ -207,7 +294,10 @@ int main(int argc, char **argv)
 	CForceMapGenerator oForceMapGenerator(src);
 
 	CForceMapGenerator::SaveDistanceMapToFile("../../../distancemap.xml", oForceMapGenerator.GetDistanceMap());
-	CForceMapGenerator::SaveForceMapToFile("../../../forcemap.xml", oForceMapGenerator.GetForceMap());
+//	CForceMapGenerator::SaveForceMapToFile("../../../forcemap.xml", oForceMapGenerator.GetForceMap());
+
+//	DrawForceMap();
+//	DrawDistanceMap();
 
 	return(0);
 }

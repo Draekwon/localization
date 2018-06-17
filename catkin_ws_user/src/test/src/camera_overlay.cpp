@@ -140,8 +140,8 @@ public:
 		Point oCroppedTopLeft(oTopLeft.x + nCroppedX, oTopLeft.y + nCroppedY);
 
 //		// publish the overlay to double check rotation and stuff
-//		Rect oRegionOfInterest = Rect(oCroppedTopLeft, oCroppedRotatedImage.size());
-//		PublishCroppedRotatedImage(oCroppedRotatedImage, oRegionOfInterest, oCenter);
+		Rect oRegionOfInterest = Rect(oCroppedTopLeft, oCroppedRotatedImage.size());
+		PublishCroppedRotatedImage(oCroppedRotatedImage, oRegionOfInterest, oCenter);
 
 		const double fMapUnit = 0.1/*10 cm*/ * SCALE_TO_PX;
 
@@ -224,6 +224,75 @@ public:
 	    return oRotatedImage;
 	}
 
+	/**
+	 * this method returns a transformation matrix
+	 * that transforms the position vectors of the contour array
+	 * to the correct (pixel) positions on the map image
+	 * @param nWidth width of camera image
+	 * @param nHeight height of camera image
+	 * @param oOdomPosition current assumed position of the car
+	 * @param fYaw current assumed rotation of the car in radians
+	 * @return the transformation matrix
+	 */
+	Mat GetTransformationMatrix(int nWidth, int nHeight, Point3d oOdomPosition, double fYaw)
+	{
+		// I have no idea why the following should be necessary...
+		fYaw = fYaw * 180 / M_PI - 180;
+		// what this does is, it converts from radians to degrees and then switches front and back.
+
+		// odom position ranges: x: 0-6; y: 0-4
+		// x is the "height" axis and y the "width" axis
+		Point3d tempPoint = Point3d(6, 4, 0) - oOdomPosition;
+		tempPoint *= SCALE_TO_PX;
+		// switch x and y so that y is the "height" and x the "width"
+		Point2d oCenter = Point(tempPoint.y, tempPoint.x);
+
+		// turn the contour points around the image center
+		Point2f oRotationCenter(nWidth / 2.0, nHeight / 2.0);
+		Mat oRotMat = getRotationMatrix2D(oRotationCenter, fYaw, 1.0);
+		// add a translation to the matrix
+		oRotMat.at<double>(0,2) += oCenter.x - nWidth/2.0;
+		oRotMat.at<double>(1,2) += oCenter.y - nHeight/2.0;
+
+		return oRotMat;
+	}
+
+	Point2d GetForceVectorWithTransformationMatrix(Mat oTransMat, vector<vector<Point>> aContours)
+	{
+		const double fMapUnit = 0.1/*10 cm*/ * SCALE_TO_PX;
+
+		for( size_t i = 0; i< aContours.size(); i++ )
+		{
+			cout << aContours[i] << endl << endl;
+		}
+		exit(0);
+//
+//		Point2d oForceVector(0,0);
+//		int counter = 0;
+//		for (int nCol = nStartingOffsetX; nCol < oCroppedRotatedImage.cols; nCol++ /*fMapUnit*/)
+//		{
+//			for (int nRow = nStartingOffsetY; nRow < oCroppedRotatedImage.rows; nRow++ /*fMapUnit*/)
+//			{
+//				if (oCroppedRotatedImage.at<int>(nCol, nRow) > 128)
+//				{
+//					// convert to map units
+//					int x = (nCol + oCroppedTopLeft.x) / (fMapUnit);
+//					int y = (nRow + oCroppedTopLeft.y) / (fMapUnit);
+//					counter++;
+////					cout << "[x,y]: " << x << " " << y << endl;
+//					oForceVector += m_oDistanceMap.at<Point2d>(x, y);
+//					Point2d distanceVec = Point2d(nCol - oCenter.x, nRow - oCenter.y);
+//					oTorque += distanceVec.cross(oForceVector);
+//				}
+//			}
+//		}
+////		cout << "counter: " << counter << endl;
+//		oForceVector /= counter == 0 ? 1 : counter;
+//		oTorque /= counter == 0 ? 1 : counter;
+//
+//		return oForceVector;
+	}
+
 	void ImageCallback(const sensor_msgs::ImageConstPtr& msg)
 	{
 		clock_t t1 = clock();
@@ -252,7 +321,7 @@ public:
 		// get contours
 		vector<vector<Point> > contours;
 		vector<Vec4i> hierarchy;
-	    findContours(pCvImg->image, contours, hierarchy, RETR_EXTERNAL, CHAIN_APPROX_NONE, Point(0,0));
+	    findContours(pCvImg->image, contours, hierarchy, RETR_LIST, CHAIN_APPROX_SIMPLE, Point(0,0));
 	    cout << "contour count: " << contours.size() << endl;
 	    Mat oContourImg = Mat::zeros( pCvImg->image.size(), CV_8UC1);
 		for( size_t i = 0; i< contours.size(); i++ )
@@ -260,11 +329,6 @@ public:
 			Scalar color = Scalar( 255 );
 			drawContours( oContourImg, contours, (int)i, color, 1, 8, hierarchy, 0, Point() );
 		}
-
-		// blur for making getting more accurate force vectors easier
-		// kind of a hack I guess
-//		Mat oBlurredImg = Mat::zeros(oContourImg.size(), CV_8UC1);
-//		blur(oContourImg, oBlurredImg, Size(5,5));
 
 		// this should basically be the odometry of the car
 		double fOdomYaw = tf::getYaw(m_oOdomPose.orientation);
@@ -280,9 +344,14 @@ public:
 		try {
 			double oTorque = 0;
 			Mat oRotatedImg = GetRotatedImg(oContourImg, fDifferentialYaw);
+//			Mat oTransformationMat = GetTransformationMatrix(pCvImg->image.cols, pCvImg->image.rows, oPosition, fDifferentialYaw);
+//			GetForceVectorWithTransformationMatrix(oTransformationMat, contours);
 			Point2d oForceVector = GetForceVector(oRotatedImg, oPosition, oTorque);
 
-
+			if (oTorque > 0)
+				fDifferentialYaw -= 1.0 / 180.0 * M_PI;
+			else
+				fDifferentialYaw += 1.0 / 180.0 * M_PI;
 			cout << "oTorque " << oTorque << endl;
 			// force vectors are scaled, so that the longest one is 1m
 			// scale them down so that the longest is 1cm
