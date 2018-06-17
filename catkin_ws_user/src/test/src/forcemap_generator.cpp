@@ -55,18 +55,18 @@ private:
 		vector<Vec4i> hierarchy;
 		findContours( oWorkingMat, contours, hierarchy, CV_RETR_LIST, CHAIN_APPROX_NONE, Point(0, 0) );
 
-	    Mat oContourImg = Mat::zeros( oWorkingMat.size(), CV_8UC1);
-		for( size_t i = 0; i< contours.size(); i++ )
-		{
-			cout << "i: " << i << " contours[i]:" << endl << contours[i] << endl << endl;
-			Scalar color = Scalar( 255 );
-			drawContours( oContourImg, contours, (int)i, color, 1, 8, hierarchy, 0, Point() );
-		}
-		namedWindow("kek", WINDOW_NORMAL);
-		imshow("kek", oWorkingMat);
-		waitKey(0);
-		imshow("kek", oContourImg);
-		waitKey(0);
+		// visualization
+//	    Mat oContourImg = Mat::zeros( oWorkingMat.size(), CV_8UC1);
+//		for( size_t i = 0; i< contours.size(); i++ )
+//		{
+//			Scalar color = Scalar( 255 );
+//			drawContours( oContourImg, contours, (int)i, color, 1, 8, hierarchy, 0, Point() );
+//		}
+//		namedWindow("kek", WINDOW_NORMAL);
+//		imshow("kek", oWorkingMat);
+//		waitKey(0);
+//		imshow("kek", oContourImg);
+//		waitKey(0);
 //		return;
 
 		cout << "contour count: " << contours.size() << endl;
@@ -74,15 +74,15 @@ private:
 		int aSizes[] = {MAP_SIZE.width, MAP_SIZE.height, contours.size()};
 		Mat oWeightMap(3, aSizes, CV_64FC1, Scalar(0));
 
-		int nStartingOffset = 0.1/*m*/ * SCALE_TO_PX / 2;
+		int nStartingOffset = 4;
 		// the following for loops calculate the weights as in the paper on p.5
 //		for (int y = 0; y < MAP_SIZE.height; y++)
 //		{
 //			// nRow, nCol are pixel coordinate on scaled WorkingMat
-//			int nRow = nStartingOffset + (int)(0.1 * SCALE_TO_PX * y);
+//			int nRow = nStartingOffset + (int)(10 * y);
 //			for (int x = 0; x < MAP_SIZE.width; x++)
 //			{
-//				int nCol = nStartingOffset + (int)(0.1 * SCALE_TO_PX * x);
+//				int nCol = nStartingOffset + (int)(10 * x);
 //
 //				// get distances to every contour and sum them up
 //				for (int nContOuter = 0; nContOuter < contours.size(); nContOuter++)
@@ -102,57 +102,56 @@ private:
 //			cout << "(nRow): (" << nRow << ")" << endl;
 //		}
 
-		// for visualization
-		namedWindow("DistanceMapDrawing", WINDOW_NORMAL);
-		RNG rng;
-		Mat oDrawMat = Mat::zeros(MAP_SIZE.width * 101, MAP_SIZE.height * 101, CV_8UC3);
+//		// for visualization
+//		namedWindow("DistanceMapDrawing", WINDOW_NORMAL);
+//		RNG rng;
+//		Mat oDrawMat = Mat::zeros(MAP_SIZE.height * 101, MAP_SIZE.width * 101, CV_8UC3);
 
 		// these loops calculate the actual force vectors as in the paper p.5
 		for (int y = 0; y < MAP_SIZE.height; y++)
 		{
 			// nRow, nCol are pixel coordinate on scaled WorkingMat
-			int nRow = nStartingOffset + (int)(0.1 * SCALE_TO_PX * y);
+			int nRow = nStartingOffset + 10 * y;
 			for (int x = 0; x < MAP_SIZE.width; x++)
 			{
-				int nCol = nStartingOffset + (int)(0.1 * SCALE_TO_PX * x);
+				int nCol = nStartingOffset + 10 * x;
 
 				// initialize distancemap with too high value for the comparison later
 				// this is kind of a hack :-/
-				m_oDistanceMap[x][y] = Point2d(20000,20000);
+				m_oDistanceMap[x][y] = Point2d(20000, 20000);
 				Point2d oForceVector(0,0);
 				// brute-force-find the closest point / shortest vector of a contour:
 				// iterate through contours
 				for (int nCont = 0; nCont < contours.size(); nCont++)
 				{
-					// initialize on needlessly huge number
+					// initialize on needlessly huge number (is hack like above)
 					double fMinDistance = 12345;
 					Point2d oMinVector(0,0);
 
 					// iterate through pixels in the contour
 					for (int nPixelCount = 0; nPixelCount < contours[nCont].size(); nPixelCount++)
 					{
-						Point_<int> keks;
-						double fDist = GetDistance(contours[nCont][nPixelCount], Point(nRow, nCol));
+						double fDist = GetDistance(contours[nCont][nPixelCount], Point(nCol, nRow));
 						if (fDist < fMinDistance)
 						{
 							fMinDistance = fDist;
-							oMinVector = Point2d(contours[nCont][nPixelCount] - Point(nRow, nCol)) *  SCALE_TO_M;
-//							oMinVector = Point2d(-oMinVector.y, -oMinVector.x);
+							oMinVector = Point2d(contours[nCont][nPixelCount] - Point(nCol, nRow)) *  SCALE_TO_M;
+							oMinVector = Point2d(-oMinVector.y, -oMinVector.x);
 						}
 					}
 					if (GetVectorLength(oMinVector) < GetVectorLength(m_oDistanceMap[x][y]))
 					{
-						m_oDistanceMap[x][y] = oMinVector;
+						m_oDistanceMap.at<Point2d>(y, x) = oMinVector;
 					}
 //					oForceVector += oWeightMap.at<double>(x, y, nCont) * oMinVector;
 				}
-//				m_oForceMap[x][y] = oForceVector;
-//				cout << "oForceVector" << "[" << x << "][" << y << "]:\t" << m_oForceMap[x][y] << endl;
-				cout << "oDistanceVector" << "[" << x << "][" << y << "]:\t" << m_oDistanceMap[x][y] << endl;
+//				m_oForceMap.at<Point2d>(y, x) = oForceVector;
+
+				cout << "(x,y): " << x << "," << y << endl;
 
 //				// visualization
 //				Point oCoordinate(50 + x * 100, 50 + y * 100);
-//				Point2d oDistVec = m_oDistanceMap[x][y] * 75 / GetVectorLength(m_oDistanceMap[x][y]);
+//				Point2d oDistVec = m_oDistanceMap[x][y] / (GetVectorLength(m_oDistanceMap[x][y]) == 0 ? 1 : GetVectorLength(m_oDistanceMap[x][y])) * 75;
 //				Scalar color = Scalar(rng.uniform(0,255), rng.uniform(0,255), rng.uniform(0,255));
 //				arrowedLine(oDrawMat, oCoordinate, oCoordinate+Point(oDistVec), color, 5, LINE_AA);
 //				imshow("DistanceMapDrawing", oDrawMat);
@@ -241,7 +240,7 @@ void DrawForceMap()
 			int nDMatRow = 50 + nFMapRow * 100;
 
 			Point2d oForceVector = oForceMap.at<Point2d>(nFMapCol, nFMapRow);
-			oForceVector = oForceVector * 75 / GetVectorLength(oForceVector);
+			oForceVector = oForceVector / (GetVectorLength(oForceVector) == 0 ? 1 : GetVectorLength(oForceVector)) * 75;
 			Scalar color = Scalar(rng.uniform(0,255), rng.uniform(0,255), rng.uniform(0,255));
 			Point oCoordinate(nDMatCol, nDMatRow);
 			arrowedLine(oDrawMat, oCoordinate, oCoordinate+Point(oForceVector), color, 5, LINE_AA);
@@ -271,10 +270,10 @@ void DrawDistanceMap()
 			int nDrawMatRow = 50 + nDMapRow * 100;
 
 			Point2d oDistVector = oDistanceMap.at<Point2d>(nDMapCol, nDMapRow);
-			oDistVector = oDistVector * 75 / GetVectorLength(oDistVector);
+			oDistVector = oDistVector / (GetVectorLength(oDistVector) == 0 ? 1 : GetVectorLength(oDistVector)) * 75;
 			Scalar color = Scalar(rng.uniform(0,255), rng.uniform(0,255), rng.uniform(0,255));
 			Point oCoordinate(nDrawMatCol, nDrawMatRow);
-			arrowedLine(oDrawMat, oCoordinate, oCoordinate+Point(oDistVector), color, 1, LINE_AA);
+			arrowedLine(oDrawMat, oCoordinate, oCoordinate+Point(oDistVector), color, 5, LINE_AA);
 		}
 	}
 	namedWindow("DistanceMap", WINDOW_NORMAL);
@@ -284,8 +283,8 @@ void DrawDistanceMap()
 
 int main(int argc, char **argv)
 {
-	String imageName("../../../captures/Lab_map_600x400_scaled.png");
-	Mat src = imread(imageName,IMREAD_GRAYSCALE);
+	String imageName("../../../captures/Lab_map_600x400.png");
+	Mat src = imread(imageName, IMREAD_GRAYSCALE);
 	if (src.empty())
 	{
 		cerr << "No image supplied ..." << endl;

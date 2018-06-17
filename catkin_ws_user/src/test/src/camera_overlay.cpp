@@ -234,63 +234,56 @@ public:
 	 * @param fYaw current assumed rotation of the car in radians
 	 * @return the transformation matrix
 	 */
-	Mat GetTransformationMatrix(int nWidth, int nHeight, Point3d oOdomPosition, double fYaw)
+	Mat GetTransformationMatrix(int nCamWidth, int nCamHeight, int nMapWidth, int nMapHeight, Point2d oCenter, double fYaw)
 	{
 		// I have no idea why the following should be necessary...
 		fYaw = fYaw * 180 / M_PI - 180;
 		// what this does is, it converts from radians to degrees and then switches front and back.
 
-		// odom position ranges: x: 0-6; y: 0-4
-		// x is the "height" axis and y the "width" axis
-		Point3d tempPoint = Point3d(6, 4, 0) - oOdomPosition;
-		tempPoint *= SCALE_TO_PX;
-		// switch x and y so that y is the "height" and x the "width"
-		Point2d oCenter = Point(tempPoint.y, tempPoint.x);
-
 		// turn the contour points around the image center
-		Point2f oRotationCenter(nWidth / 2.0, nHeight / 2.0);
+		Point2f oRotationCenter(nCamWidth / 2.0, nCamHeight / 2.0);
 		Mat oRotMat = getRotationMatrix2D(oRotationCenter, fYaw, 1.0);
 		// add a translation to the matrix
-		oRotMat.at<double>(0,2) += oCenter.x - nWidth/2.0;
-		oRotMat.at<double>(1,2) += oCenter.y - nHeight/2.0;
+		oRotMat.at<double>(0,2) += nMapWidth / 2 + oCenter.x - nCamWidth/2.0;
+		oRotMat.at<double>(1,2) += nMapHeight / 2 + oCenter.y - nCamHeight/2.0;
 
 		return oRotMat;
 	}
 
-	Point2d GetForceVectorWithTransformationMatrix(Mat oTransMat, vector<vector<Point>> aContours)
+	Point2d GetForceVectorWithTransformationMatrix(Mat oTransMat, vector<vector<Point>> aContours, double &oTorque, Point oCenter)
 	{
 		const double fMapUnit = 0.1/*10 cm*/ * SCALE_TO_PX;
 
-		for( size_t i = 0; i< aContours.size(); i++ )
+		Point2d oForceVector(0,0);
+		int counter = 0;
+		for( vector<Point> oContour : aContours )
 		{
-			cout << aContours[i] << endl << endl;
+			for (Point oValue : oContour)
+			{
+				Mat1d oValueMat(3, 1);
+				oValueMat.at<double>(0) = oValue.x;
+				oValueMat.at<double>(1) = oValue.y;
+				oValueMat.at<double>(2) = 1;
+				oValueMat = oTransMat * oValueMat;
+				Point oMapCoordinate = Point2d(oValueMat) / fMapUnit;
+
+				Rect rect(Point(), m_oDistanceMap.size());
+				if (!rect.contains(oMapCoordinate))
+				{
+					continue;
+				}
+
+				oForceVector += m_oDistanceMap.at<Point2d>(oMapCoordinate.y, oMapCoordinate.x);
+				Point2d distanceVec = Point2d(oValueMat.at<double>(0) - oCenter.x, oValueMat.at<double>(1) - oCenter.y);
+				oTorque += distanceVec.cross(m_oDistanceMap.at<Point2d>(oMapCoordinate.y, oMapCoordinate.x));
+
+				counter++;
+			}
 		}
-		exit(0);
-//
-//		Point2d oForceVector(0,0);
-//		int counter = 0;
-//		for (int nCol = nStartingOffsetX; nCol < oCroppedRotatedImage.cols; nCol++ /*fMapUnit*/)
-//		{
-//			for (int nRow = nStartingOffsetY; nRow < oCroppedRotatedImage.rows; nRow++ /*fMapUnit*/)
-//			{
-//				if (oCroppedRotatedImage.at<int>(nCol, nRow) > 128)
-//				{
-//					// convert to map units
-//					int x = (nCol + oCroppedTopLeft.x) / (fMapUnit);
-//					int y = (nRow + oCroppedTopLeft.y) / (fMapUnit);
-//					counter++;
-////					cout << "[x,y]: " << x << " " << y << endl;
-//					oForceVector += m_oDistanceMap.at<Point2d>(x, y);
-//					Point2d distanceVec = Point2d(nCol - oCenter.x, nRow - oCenter.y);
-//					oTorque += distanceVec.cross(oForceVector);
-//				}
-//			}
-//		}
-////		cout << "counter: " << counter << endl;
-//		oForceVector /= counter == 0 ? 1 : counter;
-//		oTorque /= counter == 0 ? 1 : counter;
-//
-//		return oForceVector;
+
+		oForceVector /= counter == 0 ? 1 : counter;
+		oTorque /= counter == 0 ? 1 : counter;
+		return oForceVector;
 	}
 
 	void ImageCallback(const sensor_msgs::ImageConstPtr& msg)
@@ -343,15 +336,25 @@ public:
 		Point3d oPosition = oCurrentPosePosition + oOdomPosePosition - oOldOdomPosePosition;
 		try {
 			double oTorque = 0;
-			Mat oRotatedImg = GetRotatedImg(oContourImg, fDifferentialYaw);
-//			Mat oTransformationMat = GetTransformationMatrix(pCvImg->image.cols, pCvImg->image.rows, oPosition, fDifferentialYaw);
-//			GetForceVectorWithTransformationMatrix(oTransformationMat, contours);
-			Point2d oForceVector = GetForceVector(oRotatedImg, oPosition, oTorque);
+			// odom position ranges: x: 0-6; y: 0-4
+			// x is the "height" axis and y the "width" axis
+			Point3d tempPoint = Point3d(6, 4, 0) - oPosition;
+			tempPoint *= SCALE_TO_PX;
+			// switch x and y so that y is the "height" and x the "width"
+			Point2d oCenter = Point(tempPoint.y, tempPoint.x);
 
-			if (oTorque > 0)
-				fDifferentialYaw -= 1.0 / 180.0 * M_PI;
-			else
-				fDifferentialYaw += 1.0 / 180.0 * M_PI;
+			Mat oTransformationMat = GetTransformationMatrix(pCvImg->image.cols, pCvImg->image.rows,
+					oMapImg.cols, oMapImg.rows, oCenter, fDifferentialYaw);
+			Point2d oForceVector = GetForceVectorWithTransformationMatrix(oTransformationMat, contours, oTorque, oCenter);
+
+
+//			Mat oRotatedImg = GetRotatedImg(oContourImg, fDifferentialYaw);
+//			Point2d oForceVector = GetForceVector(oRotatedImg, oPosition, oTorque);
+
+//			if (oTorque > 0)
+//				fDifferentialYaw += 1.0 / 180.0 * M_PI;
+//			else
+//				fDifferentialYaw -= 1.0 / 180.0 * M_PI;
 			cout << "oTorque " << oTorque << endl;
 			// force vectors are scaled, so that the longest one is 1m
 			// scale them down so that the longest is 1cm
@@ -383,7 +386,6 @@ public:
 			m_oOdomPub.publish(odom);
 		}catch(Exception&)
 		{
-
 		}
 		m_oOldOdomPose = m_oOdomPose;
 
