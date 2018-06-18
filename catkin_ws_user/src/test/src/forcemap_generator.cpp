@@ -71,36 +71,36 @@ private:
 
 		cout << "contour count: " << contours.size() << endl;
 		// create empty weight map
-		int aSizes[] = {MAP_SIZE.width, MAP_SIZE.height, contours.size()};
+		int aSizes[] = {MAP_SIZE.height, MAP_SIZE.width, contours.size()};
 		Mat oWeightMap(3, aSizes, CV_64FC1, Scalar(0));
 
 		int nStartingOffset = 4;
 		// the following for loops calculate the weights as in the paper on p.5
-//		for (int y = 0; y < MAP_SIZE.height; y++)
-//		{
-//			// nRow, nCol are pixel coordinate on scaled WorkingMat
-//			int nRow = nStartingOffset + (int)(10 * y);
-//			for (int x = 0; x < MAP_SIZE.width; x++)
-//			{
-//				int nCol = nStartingOffset + (int)(10 * x);
-//
-//				// get distances to every contour and sum them up
-//				for (int nContOuter = 0; nContOuter < contours.size(); nContOuter++)
-//				{
-//					double fDividentSum = 0;
-//					for (int nCont = 0; nCont < contours.size(); nCont++)
-//					{
-//						// pixel distance
-//						double fDistance = fabs(pointPolygonTest(contours[nCont], Point2d(nCol, nRow), true));
-//						fDividentSum += exp(-fDistance * SCALE_TO_M / EXP_CONST);
-//					}
-//					double fDistanceOuter = fabs(pointPolygonTest(contours[nContOuter], Point2d(nCol, nRow), true));
-//					double fWeight = exp(fDistanceOuter * SCALE_TO_M / EXP_CONST) / fDividentSum;
-//					oWeightMap.at<double>(y, x, nContOuter) = fWeight;
-//				}
-//			}
-//			cout << "(nRow): (" << nRow << ")" << endl;
-//		}
+		for (int y = 0; y < MAP_SIZE.height; y++)
+		{
+			// nRow, nCol are pixel coordinate on scaled WorkingMat
+			int nRow = nStartingOffset + 10 * y;
+			for (int x = 0; x < MAP_SIZE.width; x++)
+			{
+				int nCol = nStartingOffset + 10 * x;
+
+				// get distances to every contour and sum them up
+				for (int nContOuter = 0; nContOuter < contours.size(); nContOuter++)
+				{
+					double fDividentSum = 0;
+					for (int nCont = 0; nCont < contours.size(); nCont++)
+					{
+						// pixel distance
+						double fDistance = fabs(pointPolygonTest(contours[nCont], Point2d(nCol, nRow), true));
+						fDividentSum += exp(-fDistance * SCALE_TO_M / EXP_CONST);
+					}
+					double fDistanceOuter = fabs(pointPolygonTest(contours[nContOuter], Point2d(nCol, nRow), true));
+					double fWeight = exp(fDistanceOuter * SCALE_TO_M / EXP_CONST) / fDividentSum;
+					oWeightMap.at<double>(y, x, nContOuter) = fWeight;
+				}
+			}
+			cout << "weightmap (nRow): (" << nRow << ")" << endl;
+		}
 
 		// for visualization
 //		namedWindow("DistanceMapDrawing", WINDOW_NORMAL);
@@ -143,9 +143,9 @@ private:
 					{
 						m_oDistanceMap.at<Point2d>(y, x) = oMinVector;
 					}
-//					oForceVector += oWeightMap.at<double>(y, x, nCont) * oMinVector;
+					oForceVector += oWeightMap.at<double>(y, x, nCont) * oMinVector;
 				}
-//				m_oForceMap.at<Point2d>(y, x) = oForceVector;
+				m_oForceMap.at<Point2d>(y, x) = oForceVector;
 
 				cout << "(x,y): " << x << "," << y << "; m_oDistanceMap.at<Point2d>(y, x) " << m_oDistanceMap.at<Point2d>(y, x) << endl;
 
@@ -293,13 +293,14 @@ void CreateMaps()
 	CForceMapGenerator oForceMapGenerator(src);
 
 	CForceMapGenerator::SaveDistanceMapToFile("../../../distancemap.xml", oForceMapGenerator.GetDistanceMap());
-//	CForceMapGenerator::SaveForceMapToFile("../../../forcemap.xml", oForceMapGenerator.GetForceMap());
+	CForceMapGenerator::SaveForceMapToFile("../../../forcemap.xml", oForceMapGenerator.GetForceMap());
 }
 
 int main(int argc, char **argv)
 {
-//	CreateMaps();
+	CreateMaps();
 
+	DrawForceMap();
 	DrawDistanceMap();
 
 	return(0);
