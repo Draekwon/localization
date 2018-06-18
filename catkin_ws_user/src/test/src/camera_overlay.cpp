@@ -114,12 +114,9 @@ public:
 		m_oOdomPose = msg->pose.pose;
 	}
 
-	Point2d GetForceVector(Mat oRotatedImg, Point3d oOdomPos, double &oTorque)
+	void PublishMapOverlay(Mat oContourImg, double fYaw, Point oCenter)
 	{
-		Point3d tempPoint = Point3d(6, 4, 0) - oOdomPos;
-		cout << "tempPoint: " << tempPoint << endl;
-		tempPoint *= SCALE_TO_PX;
-		Point oCenter = Point(tempPoint.y, tempPoint.x);
+		Mat oRotatedImg = GetRotatedImg(oContourImg, fYaw);
 
 		Point oMatrixMinimum(0 - m_oMapImg.cols / 2, 0 - m_oMapImg.rows / 2);
 		Point oMatrixMaximum(m_oMapImg.cols + m_oMapImg.cols / 2, m_oMapImg.rows + m_oMapImg.rows / 2);
@@ -141,62 +138,15 @@ public:
 
 //		// publish the overlay to double check rotation and stuff
 		Rect oRegionOfInterest = Rect(oCroppedTopLeft, oCroppedRotatedImage.size());
-		PublishCroppedRotatedImage(oCroppedRotatedImage, oRegionOfInterest, oCenter);
 
-		const double fMapUnit = 0.1/*10 cm*/ * SCALE_TO_PX;
-
-		// its complicated...
-		// if (cutoff) map index * unit size + half unit size is outside the rotated image rect,
-		// add 1.
-		// example: 186 / 100 = 1.86; cutoff = 1, 
-		// add half unit size = 1 * unit size + unit size /2 = 150
-		// which is smaller than 186, so add one to the unit count:
-		// 2 * unit size + 0.5 * unit size = 250, which is bigger than 186.
-		int nStartingOffsetX = round(oCroppedTopLeft.x / fMapUnit);
-//		nStartingOffsetX = nStartingOffsetX * fMapUnit + fMapUnit / 2 < oCroppedTopLeft.x ?
-//			(nStartingOffsetX + 1) * fMapUnit + fMapUnit / 2 :
-//			nStartingOffsetX * fMapUnit + fMapUnit / 2;
-		int nStartingOffsetY = round(oCroppedTopLeft.y / fMapUnit);
-//		nStartingOffsetY = nStartingOffsetY * fMapUnit + fMapUnit / 2 < oCroppedTopLeft.y ?
-//			(nStartingOffsetY + 1) * fMapUnit + fMapUnit / 2 :
-//			nStartingOffsetY * fMapUnit + fMapUnit / 2;
-
-		Point2d oForceVector(0,0);
-		int counter = 0;
-		for (int nCol = nStartingOffsetX; nCol < oCroppedRotatedImage.cols; nCol++ /*fMapUnit*/)
-		{
-			for (int nRow = nStartingOffsetY; nRow < oCroppedRotatedImage.rows; nRow++ /*fMapUnit*/)
-			{
-				if (oCroppedRotatedImage.at<int>(nCol, nRow) > 128)
-				{
-					// convert to map units
-					int x = (nCol + oCroppedTopLeft.x) / (fMapUnit);
-					int y = (nRow + oCroppedTopLeft.y) / (fMapUnit);
-					counter++;
-//					cout << "[x,y]: " << x << " " << y << endl;
-					oForceVector += m_oDistanceMap.at<Point2d>(x, y);
-					Point2d distanceVec = Point2d(nCol - oCenter.x, nRow - oCenter.y);
-					oTorque += distanceVec.cross(oForceVector);
-				}
-			}
-		}
-//		cout << "counter: " << counter << endl;
-		oForceVector /= counter == 0 ? 1 : counter;
-		oTorque /= counter == 0 ? 1 : counter;
-
-		return oForceVector;
-	}
-
-	void PublishCroppedRotatedImage(Mat oCroppedImg, Rect roi, Point2d oCenter)
-	{
 		Mat oMapImg = Mat::zeros(m_oMapImg.size() * 2, CV_8UC1);
 		m_oMapImg.copyTo(oMapImg(Rect(oMapImg.size() / 4, m_oMapImg.size())));
-		roi.x += oMapImg.cols / 4;
-		roi.y += oMapImg.rows / 4;
+		oRegionOfInterest.x += oMapImg.cols / 4;
+		oRegionOfInterest.y += oMapImg.rows / 4;
 		oCenter.x += oMapImg.cols / 4;
 		oCenter.y += oMapImg.rows / 4;
-		Mat oDestinationRoi = oMapImg(roi);
-		oCroppedImg.copyTo(oDestinationRoi, oCroppedImg);
+		Mat oDestinationRoi = oMapImg(oRegionOfInterest);
+		oCroppedRotatedImage.copyTo(oDestinationRoi, oCroppedRotatedImage);
 		cv::circle(oMapImg, oCenter, 10, 255, -1);
 
 		sensor_msgs::ImagePtr oPubMsg = cv_bridge::CvImage(std_msgs::Header(),
@@ -234,7 +184,7 @@ public:
 	 * @param fYaw current assumed rotation of the car in radians
 	 * @return the transformation matrix
 	 */
-	Mat GetTransformationMatrix(int nCamWidth, int nCamHeight, int nMapWidth, int nMapHeight, Point2d oCenter, double fYaw)
+	Mat GetTransformationMatrix(int nCamWidth, int nCamHeight, int nMapWidth, int nMapHeight, Point oCenter, double fYaw)
 	{
 		// I have no idea why the following should be necessary...
 		fYaw = fYaw * 180 / M_PI - 180;
@@ -314,7 +264,7 @@ public:
 		// get contours
 		vector<vector<Point> > contours;
 		vector<Vec4i> hierarchy;
-	    findContours(pCvImg->image, contours, hierarchy, RETR_LIST, CHAIN_APPROX_SIMPLE, Point(0,0));
+	    findContours(pCvImg->image, contours, hierarchy, RETR_EXTERNAL, CHAIN_APPROX_NONE, Point(0,0));
 	    cout << "contour count: " << contours.size() << endl;
 	    Mat oContourImg = Mat::zeros( pCvImg->image.size(), CV_8UC1);
 		for( size_t i = 0; i< contours.size(); i++ )
@@ -341,15 +291,13 @@ public:
 			Point3d tempPoint = Point3d(6, 4, 0) - oPosition;
 			tempPoint *= SCALE_TO_PX;
 			// switch x and y so that y is the "height" and x the "width"
-			Point2d oCenter = Point(tempPoint.y, tempPoint.x);
+			Point oCenter = Point(tempPoint.y, tempPoint.x);
 
 			Mat oTransformationMat = GetTransformationMatrix(pCvImg->image.cols, pCvImg->image.rows,
 					oMapImg.cols, oMapImg.rows, oCenter, fDifferentialYaw);
 			Point2d oForceVector = GetForceVectorWithTransformationMatrix(oTransformationMat, contours, oTorque, oCenter);
 
-
-//			Mat oRotatedImg = GetRotatedImg(oContourImg, fDifferentialYaw);
-//			Point2d oForceVector = GetForceVector(oRotatedImg, oPosition, oTorque);
+			PublishMapOverlay(oContourImg, fDifferentialYaw, Point(oCenter));
 
 //			if (oTorque > 0)
 //				fDifferentialYaw += 1.0 / 180.0 * M_PI;

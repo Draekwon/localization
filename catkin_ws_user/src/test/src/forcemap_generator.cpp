@@ -96,13 +96,13 @@ private:
 //					}
 //					double fDistanceOuter = fabs(pointPolygonTest(contours[nContOuter], Point2d(nCol, nRow), true));
 //					double fWeight = exp(fDistanceOuter * SCALE_TO_M / EXP_CONST) / fDividentSum;
-//					oWeightMap.at<double>(x, y, nContOuter) = fWeight;
+//					oWeightMap.at<double>(y, x, nContOuter) = fWeight;
 //				}
 //			}
 //			cout << "(nRow): (" << nRow << ")" << endl;
 //		}
 
-//		// for visualization
+		// for visualization
 //		namedWindow("DistanceMapDrawing", WINDOW_NORMAL);
 //		RNG rng;
 //		Mat oDrawMat = Mat::zeros(MAP_SIZE.height * 101, MAP_SIZE.width * 101, CV_8UC3);
@@ -118,7 +118,7 @@ private:
 
 				// initialize distancemap with too high value for the comparison later
 				// this is kind of a hack :-/
-				m_oDistanceMap[x][y] = Point2d(20000, 20000);
+				m_oDistanceMap.at<Point2d>(y, x) = Point2d(20000, 20000);
 				Point2d oForceVector(0,0);
 				// brute-force-find the closest point / shortest vector of a contour:
 				// iterate through contours
@@ -139,17 +139,17 @@ private:
 							oMinVector = Point2d(-oMinVector.y, -oMinVector.x);
 						}
 					}
-					if (GetVectorLength(oMinVector) < GetVectorLength(m_oDistanceMap[x][y]))
+					if (GetVectorLength(oMinVector) < GetVectorLength(m_oDistanceMap.at<Point2d>(y, x)))
 					{
 						m_oDistanceMap.at<Point2d>(y, x) = oMinVector;
 					}
-//					oForceVector += oWeightMap.at<double>(x, y, nCont) * oMinVector;
+//					oForceVector += oWeightMap.at<double>(y, x, nCont) * oMinVector;
 				}
 //				m_oForceMap.at<Point2d>(y, x) = oForceVector;
 
-				cout << "(x,y): " << x << "," << y << endl;
+				cout << "(x,y): " << x << "," << y << "; m_oDistanceMap.at<Point2d>(y, x) " << m_oDistanceMap.at<Point2d>(y, x) << endl;
 
-//				// visualization
+				// visualization
 //				Point oCoordinate(50 + x * 100, 50 + y * 100);
 //				Point2d oDistVec = m_oDistanceMap[x][y] / (GetVectorLength(m_oDistanceMap[x][y]) == 0 ? 1 : GetVectorLength(m_oDistanceMap[x][y])) * 75;
 //				Scalar color = Scalar(rng.uniform(0,255), rng.uniform(0,255), rng.uniform(0,255));
@@ -239,7 +239,7 @@ void DrawForceMap()
 		{
 			int nDMatRow = 50 + nFMapRow * 100;
 
-			Point2d oForceVector = oForceMap.at<Point2d>(nFMapCol, nFMapRow);
+			Point2d oForceVector = oForceMap.at<Point2d>(nFMapRow, nFMapCol);
 			oForceVector = oForceVector / (GetVectorLength(oForceVector) == 0 ? 1 : GetVectorLength(oForceVector)) * 75;
 			Scalar color = Scalar(rng.uniform(0,255), rng.uniform(0,255), rng.uniform(0,255));
 			Point oCoordinate(nDMatCol, nDMatRow);
@@ -269,7 +269,7 @@ void DrawDistanceMap()
 		{
 			int nDrawMatRow = 50 + nDMapRow * 100;
 
-			Point2d oDistVector = oDistanceMap.at<Point2d>(nDMapCol, nDMapRow);
+			Point2d oDistVector = oDistanceMap.at<Point2d>(nDMapRow, nDMapCol);
 			oDistVector = oDistVector / (GetVectorLength(oDistVector) == 0 ? 1 : GetVectorLength(oDistVector)) * 75;
 			Scalar color = Scalar(rng.uniform(0,255), rng.uniform(0,255), rng.uniform(0,255));
 			Point oCoordinate(nDrawMatCol, nDrawMatRow);
@@ -281,22 +281,26 @@ void DrawDistanceMap()
 	waitKey(0);
 }
 
-int main(int argc, char **argv)
+void CreateMaps()
 {
 	String imageName("../../../captures/Lab_map_600x400.png");
 	Mat src = imread(imageName, IMREAD_GRAYSCALE);
 	if (src.empty())
 	{
 		cerr << "No image supplied ..." << endl;
-		return -1;
+		exit(-1);
 	}
 	CForceMapGenerator oForceMapGenerator(src);
 
 	CForceMapGenerator::SaveDistanceMapToFile("../../../distancemap.xml", oForceMapGenerator.GetDistanceMap());
 //	CForceMapGenerator::SaveForceMapToFile("../../../forcemap.xml", oForceMapGenerator.GetForceMap());
+}
 
-//	DrawForceMap();
-//	DrawDistanceMap();
+int main(int argc, char **argv)
+{
+//	CreateMaps();
+
+	DrawDistanceMap();
 
 	return(0);
 }
