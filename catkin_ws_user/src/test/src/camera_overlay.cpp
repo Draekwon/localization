@@ -200,34 +200,62 @@ public:
 		return oRotMat;
 	}
 
-	Point2d GetForceVectorWithTransformationMatrix(Mat oTransMat, vector<vector<Point>> aContours, double &oTorque, Point oCenter)
+	Point2d GetForceVectorWithTransformationMatrix(Mat oTransMat, /*vector<vector<Point>> aContours,*/ Mat oEdges, double &oTorque, Point oCenter)
 	{
 		const double fMapUnit = 0.1/*10 cm*/ * SCALE_TO_PX;
 
 		Point2d oForceVector(0,0);
 		int counter = 0;
-		for( vector<Point> oContour : aContours )
+//		for( vector<Point> oContour : aContours )
+//		{
+//			for (Point oValue : oContour)
+//			{
+//				Mat1d oValueMat(3, 1);
+//				oValueMat.at<double>(0) = oValue.x;
+//				oValueMat.at<double>(1) = oValue.y;
+//				oValueMat.at<double>(2) = 1;
+//				oValueMat = oTransMat * oValueMat;
+//				Point oMapCoordinate = Point2d(oValueMat) / fMapUnit;
+//
+//				Rect rect(Point(), m_oDistanceMap.size());
+//				if (!rect.contains(oMapCoordinate))
+//				{
+//					continue;
+//				}
+//
+//				oForceVector += m_oDistanceMap.at<Point2d>(oMapCoordinate.y, oMapCoordinate.x);
+//				Point2d distanceVec = Point2d(oValueMat.at<double>(0) - oCenter.x, oValueMat.at<double>(1) - oCenter.y);
+//				oTorque += distanceVec.cross(m_oDistanceMap.at<Point2d>(oMapCoordinate.y, oMapCoordinate.x));
+//
+//				counter++;
+//			}
+//		}
+
+		for (int x = 0; x < oEdges.cols; x++)
 		{
-			for (Point oValue : oContour)
+			for (int y = 0; y < oEdges.rows; y++)
 			{
-				Mat1d oValueMat(3, 1);
-				oValueMat.at<double>(0) = oValue.x;
-				oValueMat.at<double>(1) = oValue.y;
-				oValueMat.at<double>(2) = 1;
-				oValueMat = oTransMat * oValueMat;
-				Point oMapCoordinate = Point2d(oValueMat) / fMapUnit;
-
-				Rect rect(Point(), m_oDistanceMap.size());
-				if (!rect.contains(oMapCoordinate))
+				if (oEdges.at<int>(y, x) > 128)
 				{
-					continue;
+					Mat1d oValueMat(3, 1);
+					oValueMat.at<double>(0) = x;
+					oValueMat.at<double>(1) = y;
+					oValueMat.at<double>(2) = 1;
+					oValueMat = oTransMat * oValueMat;
+					Point oMapCoordinate = Point2d(oValueMat) / fMapUnit;
+
+					Rect rect(Point(), m_oDistanceMap.size());
+					if (!rect.contains(oMapCoordinate))
+					{
+						continue;
+					}
+
+					oForceVector += m_oDistanceMap.at<Point2d>(oMapCoordinate.y, oMapCoordinate.x);
+					Point2d distanceVec = Point2d(oValueMat.at<double>(0) - oCenter.x, oValueMat.at<double>(1) - oCenter.y);
+					oTorque += distanceVec.cross(m_oDistanceMap.at<Point2d>(oMapCoordinate.y, oMapCoordinate.x));
+
+					counter++;
 				}
-
-				oForceVector += m_oDistanceMap.at<Point2d>(oMapCoordinate.y, oMapCoordinate.x);
-				Point2d distanceVec = Point2d(oValueMat.at<double>(0) - oCenter.x, oValueMat.at<double>(1) - oCenter.y);
-				oTorque += distanceVec.cross(m_oDistanceMap.at<Point2d>(oMapCoordinate.y, oMapCoordinate.x));
-
-				counter++;
 			}
 		}
 
@@ -262,16 +290,18 @@ public:
 		emptyMat.copyTo(pCvImg->image(oModelCarRect));
 
 		// get contours
-		vector<vector<Point> > contours;
-		vector<Vec4i> hierarchy;
-	    findContours(pCvImg->image, contours, hierarchy, RETR_EXTERNAL, CHAIN_APPROX_NONE, Point(0,0));
-	    cout << "contour count: " << contours.size() << endl;
-	    Mat oContourImg = Mat::zeros( pCvImg->image.size(), CV_8UC1);
-		for( size_t i = 0; i< contours.size(); i++ )
-		{
-			Scalar color = Scalar( 255 );
-			drawContours( oContourImg, contours, (int)i, color, 1, 8, hierarchy, 0, Point() );
-		}
+//		vector<vector<Point> > contours;
+//		vector<Vec4i> hierarchy;
+		Mat edges;
+		Canny(pCvImg->image, edges, 10, 20, 7);
+//	    findContours(pCvImg->image, contours, hierarchy, RETR_EXTERNAL, CHAIN_APPROX_NONE, Point(0,0));
+//	    cout << "contour count: " << contours.size() << endl;
+//	    Mat oContourImg = Mat::zeros( pCvImg->image.size(), CV_8UC1);
+//		for( size_t i = 0; i< contours.size(); i++ )
+//		{
+//			Scalar color = Scalar( 255 );
+//			drawContours( oContourImg, contours, (int)i, color, 1, 8, hierarchy, 0, Point() );
+//		}
 
 		// this should basically be the odometry of the car
 		double fOdomYaw = tf::getYaw(m_oOdomPose.orientation);
@@ -295,14 +325,15 @@ public:
 
 			Mat oTransformationMat = GetTransformationMatrix(pCvImg->image.cols, pCvImg->image.rows,
 					oMapImg.cols, oMapImg.rows, oCenter, fDifferentialYaw);
-			Point2d oForceVector = GetForceVectorWithTransformationMatrix(oTransformationMat, contours, oTorque, oCenter);
+			Point2d oForceVector = GetForceVectorWithTransformationMatrix(oTransformationMat, edges, oTorque, oCenter);
 
-			PublishMapOverlay(oContourImg, fDifferentialYaw, Point(oCenter));
+			PublishMapOverlay(edges, fDifferentialYaw, Point(oCenter));
 
 //			if (oTorque > 0)
-//				fDifferentialYaw += 1.0 / 180.0 * M_PI;
+//				fDifferentialYaw += 0.1 / 180.0 * M_PI;
 //			else
-//				fDifferentialYaw -= 1.0 / 180.0 * M_PI;
+//				fDifferentialYaw -= 0.1 / 180.0 * M_PI;
+			fDifferentialYaw += oTorque / 100.0 / 180.0 * M_PI;
 			cout << "oTorque " << oTorque << endl;
 			// force vectors are scaled, so that the longest one is 1m
 			// scale them down so that the longest is 1cm
