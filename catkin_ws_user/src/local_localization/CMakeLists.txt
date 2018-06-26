@@ -1,5 +1,5 @@
 cmake_minimum_required(VERSION 2.8.3)
-project(test)
+project(local_localization)
 
 ## Compile as C++11, supported in ROS Kinetic and newer
 # add_compile_options(-std=c++11)
@@ -57,6 +57,7 @@ include
 ## The recommended prefix ensures that target names across packages don't collide
 add_executable(${PROJECT_NAME}_cameraOverlay src/camera_overlay.cpp)
 add_executable(${PROJECT_NAME}_forceMapGenerator src/forcemap_generator.cpp)
+add_executable(${PROJECT_NAME}_undistortCamera src/camera_undistort.cpp)
 
 ## Specify libraries to link a library or executable target against
 target_link_libraries(${PROJECT_NAME}_cameraOverlay
@@ -65,6 +66,11 @@ target_link_libraries(${PROJECT_NAME}_cameraOverlay
 )
 
 target_link_libraries(${PROJECT_NAME}_forceMapGenerator
+  ${catkin_LIBRARIES}
+  ${OpenCV_LIBS}
+)
+
+target_link_libraries(${PROJECT_NAME}_undistortCamera
   ${catkin_LIBRARIES}
   ${OpenCV_LIBS}
 )

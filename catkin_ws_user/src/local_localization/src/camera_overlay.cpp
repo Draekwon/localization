@@ -1,8 +1,8 @@
 /*
- * test_main.cpp
+ * camera_overlay.cpp
  *
  *  Created on: May 14, 2018
- *      Author: sveb36
+ *      Author: sh
  */
 
 // c++
@@ -13,12 +13,13 @@
 #include <unistd.h>
 // ros
 #include "ros/ros.h"
-#include <image_transport/image_transport.h>
-#include <cv_bridge/cv_bridge.h>
-#include <sensor_msgs/image_encodings.h>
+#include "ros/package.h"
+#include "image_transport/image_transport.h"
+#include "cv_bridge/cv_bridge.h"
+#include "sensor_msgs/image_encodings.h"
 #include "std_msgs/String.h"
-#include <tf/transform_broadcaster.h>
-#include <nav_msgs/Odometry.h>
+#include "tf/transform_broadcaster.h"
+#include "nav_msgs/Odometry.h"
 #include "geometry_msgs/Point.h"
 // opencv
 #include "opencv2/core.hpp"
@@ -32,19 +33,6 @@
 
 #include "utility.h"
 
-using namespace std;
-using namespace cv;
-using namespace cv::xfeatures2d;
-
-//! copy the following code for benchmarking:
-/*
-  	clock_t t1 = clock();
-
-	- methods to be benchmarked -
-
-	clock_t t2 = clock();
-	cout << "fSecondTS - fFirstTimeStamp: " << (float(t2 - t1)/CLOCKS_PER_SEC) << endl;
- */
 
 class CCameraOverlay
 {
@@ -60,9 +48,9 @@ class CCameraOverlay
 
 	ros::Publisher vis_pub;
 
-	Mat m_oMapImg;
-	Mat m_oForceMap;
-	Mat m_oDistanceMap;
+	cv::Mat m_oMapImg;
+	cv::Mat m_oForceMap;
+	cv::Mat m_oDistanceMap;
 
 	ros::Subscriber m_oOdomSub;
 
@@ -71,14 +59,15 @@ public:
 	CCameraOverlay()
 	: m_oImgTransport(m_oNodeHandle)
 	{
-		m_oMapImg = imread("../../../captures/Lab_map_600x400_scaled.png", IMREAD_GRAYSCALE);
+		std::string sImagePath = ros::package::getPath(PACKAGE_NAME) + "/images/";
+		std::string sMapPath = ros::package::getPath(PACKAGE_NAME) + "/mapTables/";
 
-		cv::FileStorage fs("../../../forcemap.xml", cv::FileStorage::READ);
+		m_oMapImg = imread(sImagePath + "Lab_map_600x400_scaled.png", cv::IMREAD_GRAYSCALE);
+
+		cv::FileStorage fs(sMapPath + "forcemap.xml", cv::FileStorage::READ);
 		fs["ForceMap"] >> m_oForceMap;
-		cv::FileStorage fs2("../../../distancemap.xml", cv::FileStorage::READ);
+		cv::FileStorage fs2(sMapPath + "distancemap.xml", cv::FileStorage::READ);
 		fs2["DistanceMap"] >> m_oDistanceMap;
-
-		cout << "forcemap size " << m_oForceMap.size << endl;
 
 		m_oOdomPose.position.x = 0;
 		m_oOdomPose.position.y = 0;
@@ -105,7 +94,6 @@ public:
 
 	~CCameraOverlay()
 	{
-		destroyWindow("Display window");
 	}
 
 
@@ -114,15 +102,15 @@ public:
 		m_oOdomPose = msg->pose.pose;
 	}
 
-	void PublishMapOverlay(Mat oContourImg, double fYaw, Point oCenter)
+	void PublishMapOverlay(cv::Mat oContourImg, double fYaw, cv::Point oCenter)
 	{
-		Mat oRotatedImg = GetRotatedImg(oContourImg, fYaw);
+		cv::Mat oRotatedImg = GetRotatedImg(oContourImg, fYaw);
 
-		Point oMatrixMinimum(0 - m_oMapImg.cols / 2, 0 - m_oMapImg.rows / 2);
-		Point oMatrixMaximum(m_oMapImg.cols + m_oMapImg.cols / 2, m_oMapImg.rows + m_oMapImg.rows / 2);
+		cv::Point oMatrixMinimum(0 - m_oMapImg.cols / 2, 0 - m_oMapImg.rows / 2);
+		cv::Point oMatrixMaximum(m_oMapImg.cols + m_oMapImg.cols / 2, m_oMapImg.rows + m_oMapImg.rows / 2);
 
-		Point oTopLeft(oCenter.x - oRotatedImg.cols / 2, oCenter.y - oRotatedImg.rows / 2);
-		Point oBottomRight(oTopLeft.x + oRotatedImg.cols, oTopLeft.y + oRotatedImg.rows);
+		cv::Point oTopLeft(oCenter.x - oRotatedImg.cols / 2, oCenter.y - oRotatedImg.rows / 2);
+		cv::Point oBottomRight(oTopLeft.x + oRotatedImg.cols, oTopLeft.y + oRotatedImg.rows);
 
 		int nCroppedX = oTopLeft.x < oMatrixMinimum.x ? oMatrixMinimum.x - oTopLeft.x : 0;
 		int nCroppedY = oTopLeft.y < oMatrixMinimum.y ? oMatrixMinimum.y - oTopLeft.y : 0;
@@ -131,21 +119,21 @@ public:
 		int nCroppedWidth = oRotatedImg.cols - nCroppedX - nCroppedX2;
 		int nCroppedHeight = oRotatedImg.rows - nCroppedY - nCroppedY2;
 
-		Rect oCropRoi(nCroppedX, nCroppedY, nCroppedWidth, nCroppedHeight);
-		Mat oCroppedRotatedImage = oRotatedImg(oCropRoi);
+		cv::Rect oCropRoi(nCroppedX, nCroppedY, nCroppedWidth, nCroppedHeight);
+		cv::Mat oCroppedRotatedImage = oRotatedImg(oCropRoi);
 
-		Point oCroppedTopLeft(oTopLeft.x + nCroppedX, oTopLeft.y + nCroppedY);
+		cv::Point oCroppedTopLeft(oTopLeft.x + nCroppedX, oTopLeft.y + nCroppedY);
 
 //		// publish the overlay to double check rotation and stuff
-		Rect oRegionOfInterest = Rect(oCroppedTopLeft, oCroppedRotatedImage.size());
+		cv::Rect oRegionOfInterest = cv::Rect(oCroppedTopLeft, oCroppedRotatedImage.size());
 
-		Mat oMapImg = Mat::zeros(m_oMapImg.size() * 2, CV_8UC1);
-		m_oMapImg.copyTo(oMapImg(Rect(oMapImg.size() / 4, m_oMapImg.size())));
+		cv::Mat oMapImg = cv::Mat::zeros(m_oMapImg.size() * 2, CV_8UC1);
+		m_oMapImg.copyTo(oMapImg(cv::Rect(oMapImg.size() / 4, m_oMapImg.size())));
 		oRegionOfInterest.x += oMapImg.cols / 4;
 		oRegionOfInterest.y += oMapImg.rows / 4;
 		oCenter.x += oMapImg.cols / 4;
 		oCenter.y += oMapImg.rows / 4;
-		Mat oDestinationRoi = oMapImg(oRegionOfInterest);
+		cv::Mat oDestinationRoi = oMapImg(oRegionOfInterest);
 		oCroppedRotatedImage.copyTo(oDestinationRoi, oCroppedRotatedImage);
 		cv::circle(oMapImg, oCenter, 10, 255, -1);
 
@@ -155,20 +143,20 @@ public:
 		m_oImagePub.publish(oPubMsg);
 	}
 
-	Mat GetRotatedImg(Mat oContourImg, double fYaw)
+	cv::Mat GetRotatedImg(cv::Mat oContourImg, double fYaw)
 	{
 		// I have no idea why the following should be necessary...
 		fYaw = fYaw * 180 / M_PI - 180;
 		// what this does is, it converts from radians to degrees and then switches front and back.
 
-	    Point2f oImageCenter((oContourImg.cols - 1) / 2.0, (oContourImg.rows - 1) / 2.0);
-	    Mat oRotMat = getRotationMatrix2D(oImageCenter, fYaw, 1.0);
+		cv::Point2f oImageCenter((oContourImg.cols - 1) / 2.0, (oContourImg.rows - 1) / 2.0);
+		cv::Mat oRotMat = getRotationMatrix2D(oImageCenter, fYaw, 1.0);
 
-	    Rect2f oBoundingBox = RotatedRect(oImageCenter, oContourImg.size(), fYaw).boundingRect2f();
+		cv::Rect2f oBoundingBox = cv::RotatedRect(oImageCenter, oContourImg.size(), fYaw).boundingRect2f();
 	    oRotMat.at<double>(0,2) += oBoundingBox.width / 2.0 - oContourImg.cols / 2.0;
 	    oRotMat.at<double>(1,2) += oBoundingBox.height / 2.0 - oContourImg.rows / 2.0;
 
-	    Mat oRotatedImage;
+	    cv::Mat oRotatedImage;
 	    warpAffine(oContourImg, oRotatedImage, oRotMat, oBoundingBox.size());
 
 	    return oRotatedImage;
@@ -184,15 +172,15 @@ public:
 	 * @param fYaw current assumed rotation of the car in radians
 	 * @return the transformation matrix
 	 */
-	Mat GetTransformationMatrix(int nCamWidth, int nCamHeight, int nMapWidth, int nMapHeight, Point oCenter, double fYaw)
+	cv::Mat GetTransformationMatrix(int nCamWidth, int nCamHeight, int nMapWidth, int nMapHeight, cv::Point oCenter, double fYaw)
 	{
 		// I have no idea why the following should be necessary...
 		fYaw = fYaw * 180 / M_PI - 180;
 		// what this does is, it converts from radians to degrees and then switches front and back.
 
 		// turn the contour points around the image center
-		Point2f oRotationCenter(nCamWidth / 2.0, nCamHeight / 2.0);
-		Mat oRotMat = getRotationMatrix2D(oRotationCenter, fYaw, 1.0);
+		cv::Point2f oRotationCenter(nCamWidth / 2.0, nCamHeight / 2.0);
+		cv::Mat oRotMat = getRotationMatrix2D(oRotationCenter, fYaw, 1.0);
 		// add a translation to the matrix
 		oRotMat.at<double>(0,2) += nMapWidth / 2 + oCenter.x - nCamWidth/2.0;
 		oRotMat.at<double>(1,2) += nMapHeight / 2 + oCenter.y - nCamHeight/2.0;
@@ -200,11 +188,11 @@ public:
 		return oRotMat;
 	}
 
-	Point2d GetForceVectorWithTransformationMatrix(Mat oTransMat, /*vector<vector<Point>> aContours,*/ Mat oEdges, double &oTorque, Point oCenter)
+	cv::Point2d GetForceVectorWithTransformationMatrix(cv::Mat oTransMat, /*vector<vector<Point>> aContours,*/ cv::Mat oEdges, double &oTorque, cv::Point oCenter)
 	{
 		const double fMapUnit = 0.1/*10 cm*/ * SCALE_TO_PX;
 
-		Point2d oForceVector(0,0);
+		cv::Point2d oForceVector(0,0);
 		int counter = 0;
 //		for( vector<Point> oContour : aContours )
 //		{
@@ -237,22 +225,22 @@ public:
 			{
 				if (oEdges.at<int>(y, x) > 128)
 				{
-					Mat1d oValueMat(3, 1);
+					cv::Mat1d oValueMat(3, 1);
 					oValueMat.at<double>(0) = x;
 					oValueMat.at<double>(1) = y;
 					oValueMat.at<double>(2) = 1;
 					oValueMat = oTransMat * oValueMat;
-					Point oMapCoordinate = Point2d(oValueMat) / fMapUnit;
+					cv::Point oMapCoordinate = cv::Point2d(oValueMat) / fMapUnit;
 
-					Rect rect(Point(), m_oDistanceMap.size());
+					cv::Rect rect(cv::Point(), m_oDistanceMap.size());
 					if (!rect.contains(oMapCoordinate))
 					{
 						continue;
 					}
 
-					oForceVector += m_oDistanceMap.at<Point2d>(oMapCoordinate.y, oMapCoordinate.x);
-					Point2d distanceVec = Point2d(oValueMat.at<double>(0) - oCenter.x, oValueMat.at<double>(1) - oCenter.y);
-					oTorque += distanceVec.cross(m_oDistanceMap.at<Point2d>(oMapCoordinate.y, oMapCoordinate.x));
+					oForceVector += m_oDistanceMap.at<cv::Point2d>(oMapCoordinate.y, oMapCoordinate.x);
+					cv::Point2d distanceVec = cv::Point2d(oValueMat.at<double>(0) - oCenter.x, oValueMat.at<double>(1) - oCenter.y);
+					oTorque += distanceVec.cross(m_oDistanceMap.at<cv::Point2d>(oMapCoordinate.y, oMapCoordinate.x));
 
 					counter++;
 				}
@@ -270,8 +258,6 @@ public:
 
 		cv_bridge::CvImagePtr pCvImg;
 
-		Mat oMapImg = m_oMapImg.clone();
-
 		try
 		{
 		  pCvImg = cv_bridge::toCvCopy(msg, sensor_msgs::image_encodings::MONO8 /*BGR8*/);
@@ -283,19 +269,19 @@ public:
 		}
 
 		// hide the car
-		Rect oModelCarRect(Rect(pCvImg->image.cols / 2 - CAR_SIZE.width / 2,
+		cv::Rect oModelCarRect(cv::Rect(pCvImg->image.cols / 2 - CAR_SIZE.width / 2,
 				pCvImg->image.rows / 2 - CAR_SIZE.height / 2,
 				CAR_SIZE.width, CAR_SIZE.height));
-		Mat emptyMat = Mat::zeros(CAR_SIZE.height, CAR_SIZE.width, CV_8UC1);
+		cv::Mat emptyMat = cv::Mat::zeros(CAR_SIZE.height, CAR_SIZE.width, CV_8UC1);
 		emptyMat.copyTo(pCvImg->image(oModelCarRect));
 
 		// get contours
 //		vector<vector<Point> > contours;
 //		vector<Vec4i> hierarchy;
-		Mat edges;
+		cv::Mat edges;
 		Canny(pCvImg->image, edges, 10, 20, 7);
 //	    findContours(pCvImg->image, contours, hierarchy, RETR_EXTERNAL, CHAIN_APPROX_NONE, Point(0,0));
-//	    cout << "contour count: " << contours.size() << endl;
+//	    std::cout << "contour count: " << contours.size() << std::endl;
 //	    Mat oContourImg = Mat::zeros( pCvImg->image.size(), CV_8UC1);
 //		for( size_t i = 0; i< contours.size(); i++ )
 //		{
@@ -310,40 +296,40 @@ public:
 		double fDifferentialYaw = fYaw + fOdomYaw - fOldOdomYaw;
 
 		// ros does not like to add positions, so convert them to Opencv points...
-		Point3d oOdomPosePosition(m_oOdomPose.position.x, m_oOdomPose.position.y, m_oOdomPose.position.z);
-		Point3d oOldOdomPosePosition(m_oOldOdomPose.position.x, m_oOldOdomPose.position.y, m_oOldOdomPose.position.z);
-		Point3d oCurrentPosePosition(m_oCurrentPose.position.x, m_oCurrentPose.position.y, m_oCurrentPose.position.z);
-		Point3d oPosition = oCurrentPosePosition + oOdomPosePosition - oOldOdomPosePosition;
+		cv::Point3d oOdomPosePosition(m_oOdomPose.position.x, m_oOdomPose.position.y, m_oOdomPose.position.z);
+		cv::Point3d oOldOdomPosePosition(m_oOldOdomPose.position.x, m_oOldOdomPose.position.y, m_oOldOdomPose.position.z);
+		cv::Point3d oCurrentPosePosition(m_oCurrentPose.position.x, m_oCurrentPose.position.y, m_oCurrentPose.position.z);
+		cv::Point3d oPosition = oCurrentPosePosition + oOdomPosePosition - oOldOdomPosePosition;
 		try {
 			double oTorque = 0;
 			// odom position ranges: x: 0-6; y: 0-4
 			// x is the "height" axis and y the "width" axis
-			Point3d tempPoint = Point3d(6, 4, 0) - oPosition;
+			cv::Point3d tempPoint = cv::Point3d(6, 4, 0) - oPosition;
 			tempPoint *= SCALE_TO_PX;
 			// switch x and y so that y is the "height" and x the "width"
-			Point oCenter = Point(tempPoint.y, tempPoint.x);
+			cv::Point oCenter = cv::Point(tempPoint.y, tempPoint.x);
 
-			Mat oTransformationMat = GetTransformationMatrix(pCvImg->image.cols, pCvImg->image.rows,
-					oMapImg.cols, oMapImg.rows, oCenter, fDifferentialYaw);
-			Point2d oForceVector = GetForceVectorWithTransformationMatrix(oTransformationMat, edges, oTorque, oCenter);
+			cv::Mat oTransformationMat = GetTransformationMatrix(pCvImg->image.cols, pCvImg->image.rows,
+					m_oMapImg.cols, m_oMapImg.rows, oCenter, fDifferentialYaw);
+			cv::Point2d oForceVector = GetForceVectorWithTransformationMatrix(oTransformationMat, edges, oTorque, oCenter);
 
-			PublishMapOverlay(edges, fDifferentialYaw, Point(oCenter));
+			PublishMapOverlay(edges, fDifferentialYaw, cv::Point(oCenter));
 
 //			if (oTorque > 0)
 //				fDifferentialYaw += 0.1 / 180.0 * M_PI;
 //			else
 //				fDifferentialYaw -= 0.1 / 180.0 * M_PI;
 			fDifferentialYaw += oTorque / 100.0 / 180.0 * M_PI;
-			cout << "oTorque " << oTorque << endl;
+			std::cout << "oTorque " << oTorque << std::endl;
 			// force vectors are scaled, so that the longest one is 1m
 			// scale them down so that the longest is 1cm
 			oForceVector *= 0.01;
-			cout << "forcevector2 " << GetVectorLength(oForceVector) << endl;
+			std::cout << "forcevector2 " << GetVectorLength(oForceVector) << std::endl;
 			// add the force vector to the position
-			oPosition.x += isinf(oForceVector.x) || isnan(oForceVector.x) ? 0 : oForceVector.x;
-			oPosition.y += isinf(oForceVector.y) || isnan(oForceVector.y) ? 0 : oForceVector.y;
+			oPosition.x += std::isinf(oForceVector.x) || std::isnan(oForceVector.x) ? 0 : oForceVector.x;
+			oPosition.y += std::isinf(oForceVector.y) || std::isnan(oForceVector.y) ? 0 : oForceVector.y;
 
-			cout << "Position: " << oPosition << ", forcevector: " << oForceVector << endl;
+			std::cout << "Position: " << oPosition << ", forcevector: " << oForceVector << std::endl;
 
 			nav_msgs::Odometry odom;
 			odom.header.stamp = ros::Time::now();
@@ -363,13 +349,13 @@ public:
 
 			//publish the message
 			m_oOdomPub.publish(odom);
-		}catch(Exception&)
+		}catch(std::exception&)
 		{
 		}
 		m_oOldOdomPose = m_oOdomPose;
 
 		clock_t t2 = clock();
-		cout << "ts: " << (float(t2 - t1)/CLOCKS_PER_SEC) << endl;
+		std::cout << "ts: " << (float(t2 - t1)/CLOCKS_PER_SEC) << std::endl;
 	}
 };
 
