@@ -36,9 +36,13 @@ private:
 
 	void CreateForceMap()
 	{
-		// border for map border
-		cv::Rect border(cv::Point(0,0), m_oImage.size());
-		cv::rectangle(m_oImage, border, cv::Scalar(255));
+		cv::Mat oThreshedImg;
+		cv::threshold(m_oImage, oThreshedImg, 30, 255, CV_8UC1);
+		m_oImage = oThreshedImg;
+//		cv::Mat oErodedImage;
+//		cv::Mat oStructuringElement = cv::getStructuringElement(0, cv::Size(3,3));
+//		cv::erode(oThreshedImg, oErodedImage, oStructuringElement);
+//		cv::dilate(oErodedImage, m_oImage, oStructuringElement);
 
 		// make bigger mat and put map in the center of it
 		cv::Mat oWorkingMat = cv::Mat::zeros(m_oImage.size() * 2, CV_8UC1);
@@ -55,18 +59,18 @@ private:
 		cv::findContours( oWorkingMat, contours, hierarchy, CV_RETR_LIST, cv::CHAIN_APPROX_NONE, cv::Point(0, 0) );
 
 		// visualization
-//	    Mat oContourImg = Mat::zeros( oWorkingMat.size(), CV_8UC1);
+//	    cv::Mat oContourImg = cv::Mat::zeros( oWorkingMat.size(), CV_8UC1);
 //		for( size_t i = 0; i< contours.size(); i++ )
 //		{
-//			Scalar color = Scalar( 255 );
-//			drawContours( oContourImg, contours, (int)i, color, 1, 8, hierarchy, 0, Point() );
+//			cv::Scalar color = cv::Scalar( 255 );
+//			drawContours( oContourImg, contours, (int)i, color, 1, 8, hierarchy, 0, cv::Point() );
 //		}
-//		namedWindow("kek", WINDOW_NORMAL);
+//		cv::namedWindow("kek", cv::WINDOW_NORMAL);
 //		imshow("kek", oWorkingMat);
-//		waitKey(0);
+//		cv::waitKey(0);
 //		imshow("kek", oContourImg);
-//		waitKey(0);
-//		return;
+//		cv::waitKey(0);
+//		exit(0);
 
 		std::cout << "contour count: " << contours.size() << std::endl;
 		// create empty weight map
@@ -91,10 +95,10 @@ private:
 					{
 						// pixel distance
 						double fDistance = fabs(pointPolygonTest(contours[nCont], cv::Point2d(nCol, nRow), true));
-						fDividentSum += exp(-fDistance * SCALE_TO_M / EXP_CONST);
+						fDividentSum += exp(-fDistance * CM_TO_M / EXP_CONST);
 					}
 					double fDistanceOuter = fabs(pointPolygonTest(contours[nContOuter], cv::Point2d(nCol, nRow), true));
-					double fWeight = exp(fDistanceOuter * SCALE_TO_M / EXP_CONST) / fDividentSum;
+					double fWeight = exp(fDistanceOuter * CM_TO_M / EXP_CONST) / fDividentSum;
 					oWeightMap.at<double>(y, x, nContOuter) = fWeight;
 				}
 			}
@@ -134,7 +138,7 @@ private:
 						if (fDist < fMinDistance)
 						{
 							fMinDistance = fDist;
-							oMinVector = cv::Point2d(contours[nCont][nPixelCount] - cv::Point(nCol, nRow)) *  SCALE_TO_M;
+							oMinVector = cv::Point2d(contours[nCont][nPixelCount] - cv::Point(nCol, nRow)) *  CM_TO_M;
 							oMinVector = cv::Point2d(-oMinVector.y, -oMinVector.x);
 						}
 					}
@@ -231,7 +235,6 @@ public:
 		cv::RNG rng;
 
 		cv::Mat oDrawMat = cv::Mat::zeros(oForceMap.rows * 101, oForceMap.cols * 101, CV_8UC3);
-		std::cout << oDrawMat.size << std::endl;
 		for (int nFMapCol = 0; nFMapCol < oForceMap.cols; nFMapCol++)
 		{
 			int nDMatCol = 50 + nFMapCol * 100;
@@ -263,7 +266,6 @@ public:
 		cv::RNG rng;
 
 		cv::Mat oDrawMat = cv::Mat::zeros(oDistanceMap.rows * 101, oDistanceMap.cols * 101, CV_8UC3);
-		std::cout << oDrawMat.size << std::endl;
 		for (int nDMapCol = 0; nDMapCol < oDistanceMap.cols; nDMapCol++)
 		{
 			int nDrawMatCol = 50 + nDMapCol * 100;
@@ -307,7 +309,7 @@ void CreateMaps()
 
 int main(int argc, char **argv)
 {
-	CreateMaps();
+	//CreateMaps();
 
 	CForceMapGenerator::DrawForceMap();
 	CForceMapGenerator::DrawDistanceMap();

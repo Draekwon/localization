@@ -15,9 +15,10 @@
 
 const std::string PACKAGE_NAME = "local_localization";
 
-const double SCALE_TO_PX = 1114.0 * 100 / 600.0;
-const double SCALE_TO_M = 600.0 / (1114.0 * 100);
-const cv::Size CAR_SIZE = cv::Size(44, 92);
+const double M_TO_CM = 100.0;
+const double CM_TO_M = 1.0/100.0;
+//! car size is in cm
+const cv::Size CAR_SIZE = cv::Size(26, 60);
 const cv::Size MAP_SIZE = cv::Size(80 - 1, 120 - 1);
 
 // convenience functions

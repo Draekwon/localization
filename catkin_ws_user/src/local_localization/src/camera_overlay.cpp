@@ -54,15 +54,23 @@ class CCameraOverlay
 
 	ros::Subscriber m_oOdomSub;
 
+	double	m_fScaleFactor;
+
+	std::string m_sWindowName = "CamOverlay";
+
 public:
 
-	CCameraOverlay()
-	: m_oImgTransport(m_oNodeHandle)
+	/**
+	 * subscribes to /odom and /usb_cam/image_undistorted and publishes /MATRIX_Location (odometry) and /camera_overlay (image)
+	 * @param fScaleFactor		scales the camera image so that 1px = 1cm
+	 */
+	CCameraOverlay(double fScaleFactor)
+	: m_oImgTransport(m_oNodeHandle), m_fScaleFactor(fScaleFactor)
 	{
 		std::string sImagePath = ros::package::getPath(PACKAGE_NAME) + "/images/";
 		std::string sMapPath = ros::package::getPath(PACKAGE_NAME) + "/mapTables/";
 
-		m_oMapImg = imread(sImagePath + "Lab_map_600x400_scaled.png", cv::IMREAD_GRAYSCALE);
+		m_oMapImg = imread(sImagePath + "Lab_map_600x400.png", cv::IMREAD_GRAYSCALE);
 
 		cv::FileStorage fs(sMapPath + "forcemap.xml", cv::FileStorage::READ);
 		fs["ForceMap"] >> m_oForceMap;
@@ -82,6 +90,8 @@ public:
 		m_oCurrentPose.position.z = 0;
 		m_oCurrentPose.orientation = tf::createQuaternionMsgFromYaw(0);
 
+//		cv::namedWindow(m_sWindowName, CV_WINDOW_NORMAL);
+
 		// publish a position by publishing odometry
 		m_oOdomPub = m_oNodeHandle.advertise<nav_msgs::Odometry>("MATRIX_Location", 50);
 		m_oImagePub = m_oImgTransport.advertise("/camera_overlay", 1);
@@ -97,11 +107,21 @@ public:
 	}
 
 
+	/**
+	 * this callback saves the current odometry in a class variable
+	 * @param msg	the odometry-message
+	 */
 	void OdomCallback(const nav_msgs::OdometryConstPtr& msg)
 	{
 		m_oOdomPose = msg->pose.pose;
 	}
 
+	/**
+	 * this method rotates and overlays the camera image on the map. the result is published to "/camera_overlay"
+	 * @param oContourImg	the image contours of the camera image
+	 * @param fYaw			the angle in radians
+	 * @param oCenter		the assumed position of the car in pixel coordinates
+	 */
 	void PublishMapOverlay(cv::Mat oContourImg, double fYaw, cv::Point oCenter)
 	{
 		cv::Mat oRotatedImg = GetRotatedImg(oContourImg, fYaw);
@@ -138,11 +158,17 @@ public:
 		cv::circle(oMapImg, oCenter, 10, 255, -1);
 
 		sensor_msgs::ImagePtr oPubMsg = cv_bridge::CvImage(std_msgs::Header(),
-				sensor_msgs::image_encodings::MONO8, /*oContourImg*/oMapImg).toImageMsg();
+				sensor_msgs::image_encodings::MONO8, oMapImg).toImageMsg();
 		// Output modified video stream
 		m_oImagePub.publish(oPubMsg);
 	}
 
+	/**
+	 * this method rotates the camera image for a visualization of where the camera image is related to the map
+	 * @param oContourImg	contour-image of the camera image
+	 * @param fYaw			angle by which to turn the image in rad
+	 * @return				properly rotated image
+	 */
 	cv::Mat GetRotatedImg(cv::Mat oContourImg, double fYaw)
 	{
 		// I have no idea why the following should be necessary...
@@ -168,7 +194,7 @@ public:
 	 * to the correct (pixel) positions on the map image
 	 * @param nWidth width of camera image
 	 * @param nHeight height of camera image
-	 * @param oOdomPosition current assumed position of the car
+	 * @param oOdomPosition current assumed position of the car in image coordinates
 	 * @param fYaw current assumed rotation of the car in radians
 	 * @return the transformation matrix
 	 */
@@ -188,42 +214,26 @@ public:
 		return oRotMat;
 	}
 
-	cv::Point2d GetForceVectorWithTransformationMatrix(cv::Mat oTransMat, /*vector<vector<Point>> aContours,*/ cv::Mat oEdges, double &oTorque, cv::Point oCenter)
+	/**
+	 * uses a transformationmatrix to map image pixels to the force field and returns the average of the force vectors
+	 * @param oTransMat	transformation matrix
+	 * @param oImg		image
+	 * @param oTorque	the torque calculated by using the 2D-cross product. It will be saved in this var.
+	 * @param oCenter	the assumed position of the  car
+	 * @return			the averaged force vector
+	 */
+	cv::Point2d GetForceVector(cv::Mat oTransMat, cv::Mat oImg, double &oTorque, cv::Point oCenter)
 	{
-		const double fMapUnit = 0.1/*10 cm*/ * SCALE_TO_PX;
+		const double fMapUnit = 10; //10 cm
 
 		cv::Point2d oForceVector(0,0);
 		int counter = 0;
-//		for( vector<Point> oContour : aContours )
-//		{
-//			for (Point oValue : oContour)
-//			{
-//				Mat1d oValueMat(3, 1);
-//				oValueMat.at<double>(0) = oValue.x;
-//				oValueMat.at<double>(1) = oValue.y;
-//				oValueMat.at<double>(2) = 1;
-//				oValueMat = oTransMat * oValueMat;
-//				Point oMapCoordinate = Point2d(oValueMat) / fMapUnit;
-//
-//				Rect rect(Point(), m_oDistanceMap.size());
-//				if (!rect.contains(oMapCoordinate))
-//				{
-//					continue;
-//				}
-//
-//				oForceVector += m_oDistanceMap.at<Point2d>(oMapCoordinate.y, oMapCoordinate.x);
-//				Point2d distanceVec = Point2d(oValueMat.at<double>(0) - oCenter.x, oValueMat.at<double>(1) - oCenter.y);
-//				oTorque += distanceVec.cross(m_oDistanceMap.at<Point2d>(oMapCoordinate.y, oMapCoordinate.x));
-//
-//				counter++;
-//			}
-//		}
 
-		for (int x = 0; x < oEdges.cols; x++)
+		for (int x = 0; x < oImg.cols; x++)
 		{
-			for (int y = 0; y < oEdges.rows; y++)
+			for (int y = 0; y < oImg.rows; y++)
 			{
-				if (oEdges.at<int>(y, x) > 128)
+				if (oImg.at<int>(y, x) > 128)
 				{
 					cv::Mat1d oValueMat(3, 1);
 					oValueMat.at<double>(0) = x;
@@ -252,6 +262,41 @@ public:
 		return oForceVector;
 	}
 
+	/**
+	 * scales, filters and converts the camera image to gray scale
+	 * @param oCameraImg	Camera image
+	 * @return
+	 */
+	cv::Mat PrepareCameraImage(cv::Mat oCameraImg)
+	{
+		// maybe erode and dilute before scaling the img?
+
+		cv::Mat oScaledImage;
+		cv::resize(oCameraImg, oScaledImage, cv::Size(), m_fScaleFactor, m_fScaleFactor);
+		oCameraImg = oScaledImage;
+
+		// hide the car
+		cv::Rect oModelCarRect(cv::Rect(oCameraImg.cols / 2 - CAR_SIZE.width / 2,
+				oCameraImg.rows / 2 - CAR_SIZE.height / 2,
+				CAR_SIZE.width, CAR_SIZE.height));
+		cv::Mat emptyMat = cv::Mat::zeros(CAR_SIZE.height, CAR_SIZE.width, CV_8UC3);
+		emptyMat.copyTo(oCameraImg(oModelCarRect));
+
+		cv::Mat oHsvImg;
+		cvtColor(oCameraImg, oHsvImg, CV_BGR2HSV);
+		cv::Mat oRangedImg;
+		cv::inRange(oHsvImg, cv::Scalar(0, 0, 50), cv::Scalar(255, 100, 255), oRangedImg);
+
+		return oRangedImg;
+	}
+
+
+	/**
+	 * callback for /usb_cam/image_undistorted.
+	 * This is the main part of this class.
+	 * Here, the camera image is used to improve the position the odometry returns.
+	 * @param msg 	The image-message containing the camera-image.
+	 */
 	void ImageCallback(const sensor_msgs::ImageConstPtr& msg)
 	{
 		clock_t t1 = clock();
@@ -260,7 +305,7 @@ public:
 
 		try
 		{
-		  pCvImg = cv_bridge::toCvCopy(msg, sensor_msgs::image_encodings::MONO8 /*BGR8*/);
+		  pCvImg = cv_bridge::toCvCopy(msg, sensor_msgs::image_encodings::BGR8);
 		}
 		catch (cv_bridge::Exception& e)
 		{
@@ -268,26 +313,7 @@ public:
 		  return;
 		}
 
-		// hide the car
-		cv::Rect oModelCarRect(cv::Rect(pCvImg->image.cols / 2 - CAR_SIZE.width / 2,
-				pCvImg->image.rows / 2 - CAR_SIZE.height / 2,
-				CAR_SIZE.width, CAR_SIZE.height));
-		cv::Mat emptyMat = cv::Mat::zeros(CAR_SIZE.height, CAR_SIZE.width, CV_8UC1);
-		emptyMat.copyTo(pCvImg->image(oModelCarRect));
-
-		// get contours
-//		vector<vector<Point> > contours;
-//		vector<Vec4i> hierarchy;
-		cv::Mat edges;
-		Canny(pCvImg->image, edges, 10, 20, 7);
-//	    findContours(pCvImg->image, contours, hierarchy, RETR_EXTERNAL, CHAIN_APPROX_NONE, Point(0,0));
-//	    std::cout << "contour count: " << contours.size() << std::endl;
-//	    Mat oContourImg = Mat::zeros( pCvImg->image.size(), CV_8UC1);
-//		for( size_t i = 0; i< contours.size(); i++ )
-//		{
-//			Scalar color = Scalar( 255 );
-//			drawContours( oContourImg, contours, (int)i, color, 1, 8, hierarchy, 0, Point() );
-//		}
+		cv::Mat oPreparedCameraImg = PrepareCameraImage(pCvImg->image);
 
 		// this should basically be the odometry of the car
 		double fOdomYaw = tf::getYaw(m_oOdomPose.orientation);
@@ -305,21 +331,22 @@ public:
 			// odom position ranges: x: 0-6; y: 0-4
 			// x is the "height" axis and y the "width" axis
 			cv::Point3d tempPoint = cv::Point3d(6, 4, 0) - oPosition;
-			tempPoint *= SCALE_TO_PX;
+			tempPoint *= M_TO_CM;
 			// switch x and y so that y is the "height" and x the "width"
+			//! oCenter is the position of the car in image coordinates
 			cv::Point oCenter = cv::Point(tempPoint.y, tempPoint.x);
 
-			cv::Mat oTransformationMat = GetTransformationMatrix(pCvImg->image.cols, pCvImg->image.rows,
+			cv::Mat oTransformationMat = GetTransformationMatrix(oPreparedCameraImg.cols, oPreparedCameraImg.rows,
 					m_oMapImg.cols, m_oMapImg.rows, oCenter, fDifferentialYaw);
-			cv::Point2d oForceVector = GetForceVectorWithTransformationMatrix(oTransformationMat, edges, oTorque, oCenter);
+			cv::Point2d oForceVector = GetForceVector(oTransformationMat, oPreparedCameraImg, oTorque, oCenter);
 
-			PublishMapOverlay(edges, fDifferentialYaw, cv::Point(oCenter));
+			PublishMapOverlay(oPreparedCameraImg, fDifferentialYaw, cv::Point(oCenter));
 
 //			if (oTorque > 0)
 //				fDifferentialYaw += 0.1 / 180.0 * M_PI;
 //			else
 //				fDifferentialYaw -= 0.1 / 180.0 * M_PI;
-			fDifferentialYaw += oTorque / 100.0 / 180.0 * M_PI;
+			fDifferentialYaw += oTorque / 10.0 / 180.0 * M_PI;
 			std::cout << "oTorque " << oTorque << std::endl;
 			// force vectors are scaled, so that the longest one is 1m
 			// scale them down so that the longest is 1cm
@@ -344,7 +371,7 @@ public:
 			//set the position
 			odom.pose.pose = m_oCurrentPose;
 
-			//set the velocity
+			//set the velocityoPreparedCameraImg
 	//		odom.child_frame_id = "base_link";
 
 			//publish the message
@@ -363,7 +390,7 @@ public:
 int main(int argc, char **argv)
 {
 	ros::init(argc, argv, "camera_overlay");
-	CCameraOverlay oImgTest;
+	CCameraOverlay oImgTest(600.0 / 1114.0);
 	ros::spin();
 	return 0;
 }
