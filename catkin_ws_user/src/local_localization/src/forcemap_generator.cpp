@@ -39,10 +39,6 @@ private:
 		cv::Mat oThreshedImg;
 		cv::threshold(m_oImage, oThreshedImg, 30, 255, CV_8UC1);
 		m_oImage = oThreshedImg;
-//		cv::Mat oErodedImage;
-//		cv::Mat oStructuringElement = cv::getStructuringElement(0, cv::Size(3,3));
-//		cv::erode(oThreshedImg, oErodedImage, oStructuringElement);
-//		cv::dilate(oErodedImage, m_oImage, oStructuringElement);
 
 		// make bigger mat and put map in the center of it
 		cv::Mat oWorkingMat = cv::Mat::zeros(m_oImage.size() * 2, CV_8UC1);
@@ -59,12 +55,13 @@ private:
 		cv::findContours( oWorkingMat, contours, hierarchy, CV_RETR_LIST, cv::CHAIN_APPROX_NONE, cv::Point(0, 0) );
 
 		// visualization
-//	    cv::Mat oContourImg = cv::Mat::zeros( oWorkingMat.size(), CV_8UC1);
+	    cv::Mat oContourImg = cv::Mat::zeros( oWorkingMat.size(), CV_8UC1);
 //		for( size_t i = 0; i< contours.size(); i++ )
 //		{
 //			cv::Scalar color = cv::Scalar( 255 );
 //			drawContours( oContourImg, contours, (int)i, color, 1, 8, hierarchy, 0, cv::Point() );
 //		}
+
 //		cv::namedWindow("kek", cv::WINDOW_NORMAL);
 //		imshow("kek", oWorkingMat);
 //		cv::waitKey(0);
@@ -105,11 +102,6 @@ private:
 			std::cout << "weightmap (nRow): (" << nRow << ")" << std::endl;
 		}
 
-		// for visualization
-//		namedWindow("DistanceMapDrawing", WINDOW_NORMAL);
-//		RNG rng;
-//		Mat oDrawMat = Mat::zeros(MAP_SIZE.height * 101, MAP_SIZE.width * 101, CV_8UC3);
-
 		// these loops calculate the actual force vectors as in the paper p.5
 		for (int y = 0; y < MAP_SIZE.height; y++)
 		{
@@ -119,30 +111,28 @@ private:
 			{
 				int nCol = nStartingOffset + 10 * x;
 
-				// initialize distancemap with too high value for the comparison later
-				// this is kind of a hack :-/
-				m_oDistanceMap.at<cv::Point2d>(y, x) = cv::Point2d(20000, 20000);
+				// initialize distancemap on first value for the comparison later
+				m_oDistanceMap.at<cv::Point2d>(y, x) = cv::Point2d(contours[0][0] - cv::Point(nCol, nRow)) *  CM_TO_M;
 				cv::Point2d oForceVector(0,0);
 				// brute-force-find the closest point / shortest vector of a contour:
 				// iterate through contours
 				for (int nCont = 0; nCont < contours.size(); nCont++)
 				{
-					// initialize on needlessly huge number (is hack like above)
-					double fMinDistance = 12345;
-					cv::Point2d oMinVector(0,0);
+					// initialize on first number
+					double fMinDistance = GetDistance(contours[nCont][0], cv::Point(nCol, nRow));
+					cv::Point2d oMinVector = cv::Point2d(contours[nCont][0] - cv::Point(nCol, nRow)) *  CM_TO_M;
 
-					// iterate through pixels in the contour
-					for (int nPixelCount = 0; nPixelCount < contours[nCont].size(); nPixelCount++)
+					// iterate through pixels in the contour (skip first number)
+					for (int nPixelCount = 1; nPixelCount < contours[nCont].size(); nPixelCount++)
 					{
 						double fDist = GetDistance(contours[nCont][nPixelCount], cv::Point(nCol, nRow));
 						if (fDist < fMinDistance)
 						{
 							fMinDistance = fDist;
 							oMinVector = cv::Point2d(contours[nCont][nPixelCount] - cv::Point(nCol, nRow)) *  CM_TO_M;
-							oMinVector = cv::Point2d(-oMinVector.y, -oMinVector.x);
 						}
 					}
-					if (GetVectorLength(oMinVector) < GetVectorLength(m_oDistanceMap.at<cv::Point2d>(y, x)))
+					if (fMinDistance < GetVectorLength(m_oDistanceMap.at<cv::Point2d>(y, x)))
 					{
 						m_oDistanceMap.at<cv::Point2d>(y, x) = oMinVector;
 					}
@@ -151,14 +141,6 @@ private:
 				m_oForceMap.at<cv::Point2d>(y, x) = oForceVector;
 
 				std::cout << "(x,y): " << x << "," << y << "; m_oDistanceMap.at<Point2d>(y, x) " << m_oDistanceMap.at<cv::Point2d>(y, x) << std::endl;
-
-				// visualization
-//				Point oCoordinate(50 + x * 100, 50 + y * 100);
-//				Point2d oDistVec = m_oDistanceMap[x][y] / (GetVectorLength(m_oDistanceMap[x][y]) == 0 ? 1 : GetVectorLength(m_oDistanceMap[x][y])) * 75;
-//				Scalar color = Scalar(rng.uniform(0,255), rng.uniform(0,255), rng.uniform(0,255));
-//				arrowedLine(oDrawMat, oCoordinate, oCoordinate+Point(oDistVec), color, 5, LINE_AA);
-//				imshow("DistanceMapDrawing", oDrawMat);
-//				waitKey(3);
 			}
 		}
 
@@ -197,6 +179,30 @@ public:
 	cv::Mat GetDistanceMap()
 	{
 		return m_oDistanceMap;
+	}
+
+	void SaveDistanceMapToFile(std::string sFilename)
+	{
+		if (m_oDistanceMap.empty())
+		{
+			std::cerr << "No DistanceMap supplied ..." << std::endl;
+			return;
+		}
+		cv::FileStorage file(sFilename, cv::FileStorage::WRITE, "UTF-8");
+		file << "DistanceMap" << m_oDistanceMap;
+		file.release();
+	}
+
+	void SaveForceMapToFile(std::string sFilename)
+	{
+		if (m_oForceMap.empty())
+		{
+			std::cerr << "No ForceMap supplied ..." << std::endl;
+			return;
+		}
+		cv::FileStorage file(sFilename, cv::FileStorage::WRITE, "UTF-8");
+		file << "ForceMap" << m_oForceMap;
+		file.release();
 	}
 
 	static void SaveDistanceMapToFile(std::string sFilename, cv::Mat oDistanceMap)
@@ -303,16 +309,16 @@ void CreateMaps()
 	CForceMapGenerator oForceMapGenerator(src);
 
 	std::string sMapPath = ros::package::getPath(PACKAGE_NAME) + "/mapTables/";
-	CForceMapGenerator::SaveDistanceMapToFile(sMapPath + "distancemap.xml", oForceMapGenerator.GetDistanceMap());
-	CForceMapGenerator::SaveForceMapToFile(sMapPath + "forcemap.xml", oForceMapGenerator.GetForceMap());
+	oForceMapGenerator.SaveDistanceMapToFile(sMapPath + "distancemap.xml");
+	oForceMapGenerator.SaveForceMapToFile(sMapPath + "forcemap.xml");
 }
 
 int main(int argc, char **argv)
 {
-	//CreateMaps();
+	CreateMaps();
 
-	CForceMapGenerator::DrawForceMap();
-	CForceMapGenerator::DrawDistanceMap();
+//	CForceMapGenerator::DrawForceMap();
+//	CForceMapGenerator::DrawDistanceMap();
 
 	return(0);
 }

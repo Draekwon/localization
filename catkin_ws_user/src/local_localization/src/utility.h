@@ -19,7 +19,7 @@ const double M_TO_CM = 100.0;
 const double CM_TO_M = 1.0/100.0;
 //! car size is in cm
 const cv::Size CAR_SIZE = cv::Size(26, 60);
-const cv::Size MAP_SIZE = cv::Size(80 - 1, 120 - 1);
+const cv::Size MAP_SIZE = cv::Size(120 - 1, 80 - 1);
 
 // convenience functions
 
