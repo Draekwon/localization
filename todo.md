@@ -23,7 +23,7 @@
 **29.06.18**
 
 * ~~replace edge detection with thresholding~~
-   - ~~use eroding and dilating for noise reduction~~
+   - ~~use eroding and dilating for noise reduction~~ -> because the image is so small this eliminates most of the edges as well
    - ~~do that for the force and distance fields as well~~
    _done_ more or less
 * ~~change how I treat the camera overlay -> right now I scale the underlying image. I should scale the camera image to the appropriate size instead~~
