@@ -78,7 +78,7 @@ private:
 		// the following for loops calculate the weights as in the paper on p.5
 		for (int y = 0; y < MAP_SIZE.height; y++)
 		{
-			// nRow, nCol are pixel coordinate on scaled WorkingMat
+			// nRow, nCol are pixel coordinate on WorkingMat
 			int nRow = nStartingOffset + 10 * y;
 			for (int x = 0; x < MAP_SIZE.width; x++)
 			{
@@ -92,10 +92,10 @@ private:
 					{
 						// pixel distance
 						double fDistance = fabs(pointPolygonTest(contours[nCont], cv::Point2d(nCol, nRow), true));
-						fDividentSum += exp(-fDistance * CM_TO_M / EXP_CONST);
+						fDividentSum += exp(-fDistance / EXP_CONST);
 					}
 					double fDistanceOuter = fabs(pointPolygonTest(contours[nContOuter], cv::Point2d(nCol, nRow), true));
-					double fWeight = exp(fDistanceOuter * CM_TO_M / EXP_CONST) / fDividentSum;
+					double fWeight = exp(fDistanceOuter / EXP_CONST) / fDividentSum;
 					oWeightMap.at<double>(y, x, nContOuter) = fWeight;
 				}
 			}
@@ -105,14 +105,14 @@ private:
 		// these loops calculate the actual force vectors as in the paper p.5
 		for (int y = 0; y < MAP_SIZE.height; y++)
 		{
-			// nRow, nCol are pixel coordinate on scaled WorkingMat
+			// nRow, nCol are pixel coordinate on WorkingMat
 			int nRow = nStartingOffset + 10 * y;
 			for (int x = 0; x < MAP_SIZE.width; x++)
 			{
 				int nCol = nStartingOffset + 10 * x;
 
 				// initialize distancemap on first value for the comparison later
-				m_oDistanceMap.at<cv::Point2d>(y, x) = cv::Point2d(contours[0][0] - cv::Point(nCol, nRow)) *  CM_TO_M;
+				m_oDistanceMap.at<cv::Point2d>(y, x) = cv::Point2d(contours[0][0] - cv::Point(nCol, nRow));
 				cv::Point2d oForceVector(0,0);
 				// brute-force-find the closest point / shortest vector of a contour:
 				// iterate through contours
@@ -120,16 +120,16 @@ private:
 				{
 					// initialize on first number
 					double fMinDistance = GetDistance(contours[nCont][0], cv::Point(nCol, nRow));
-					cv::Point2d oMinVector = cv::Point2d(contours[nCont][0] - cv::Point(nCol, nRow)) *  CM_TO_M;
+					cv::Point2d oMinVector = cv::Point2d(contours[nCont][0] - cv::Point(nCol, nRow));
 
-					// iterate through pixels in the contour (skip first number)
+					// iterate through pixels in the contour (skip first)
 					for (int nPixelCount = 1; nPixelCount < contours[nCont].size(); nPixelCount++)
 					{
 						double fDist = GetDistance(contours[nCont][nPixelCount], cv::Point(nCol, nRow));
 						if (fDist < fMinDistance)
 						{
 							fMinDistance = fDist;
-							oMinVector = cv::Point2d(contours[nCont][nPixelCount] - cv::Point(nCol, nRow)) *  CM_TO_M;
+							oMinVector = cv::Point2d(contours[nCont][nPixelCount] - cv::Point(nCol, nRow));
 						}
 					}
 					if (fMinDistance < GetVectorLength(m_oDistanceMap.at<cv::Point2d>(y, x)))
@@ -151,10 +151,15 @@ private:
 		{
 			for (int x = 0; x < MAP_SIZE.width; x++)
 			{
-				if (GetVectorLength(m_oForceMap[x][y]) > fLargestForce)
-					fLargestForce = GetVectorLength(m_oForceMap[x][y]);
-				if (GetVectorLength(m_oDistanceMap[x][y]) > fLongestDistance)
-					fLongestDistance = GetVectorLength(m_oDistanceMap[x][y]);
+				if (GetVectorLength(m_oForceMap.at<cv::Point2d>(y, x)) > fLargestForce)
+					fLargestForce = GetVectorLength(m_oForceMap.at<cv::Point2d>(y, x));
+				if (GetVectorLength(m_oDistanceMap.at<cv::Point2d>(y, x)) > fLongestDistance)
+					fLongestDistance = GetVectorLength(m_oDistanceMap.at<cv::Point2d>(y, x));
+				if (std::isinf(fLongestDistance))
+				{
+					std::cout << x << " " << y << " " << m_oDistanceMap.at<cv::Point2d>(y, x) << fLongestDistance << std::endl;
+					exit(-1);
+				}
 			}
 		}
 		m_oForceMap /= fLargestForce;
@@ -249,7 +254,7 @@ public:
 				int nDMatRow = 50 + nFMapRow * 100;
 
 				cv::Point2d oForceVector = oForceMap.at<cv::Point2d>(nFMapRow, nFMapCol);
-				oForceVector = oForceVector / (GetVectorLength(oForceVector) == 0 ? 1 : GetVectorLength(oForceVector)) * 75;
+				oForceVector = oForceVector * 1000; // / (GetVectorLength(oForceVector) == 0 ? 1 : GetVectorLength(oForceVector)) * 75;
 				cv::Scalar color = cv::Scalar(rng.uniform(0,255), rng.uniform(0,255), rng.uniform(0,255));
 				cv::Point oCoordinate(nDMatCol, nDMatRow);
 				arrowedLine(oDrawMat, oCoordinate, oCoordinate + cv::Point(oForceVector), color, 5, cv::LINE_AA);
@@ -280,7 +285,7 @@ public:
 				int nDrawMatRow = 50 + nDMapRow * 100;
 
 				cv::Point2d oDistVector = oDistanceMap.at<cv::Point2d>(nDMapRow, nDMapCol);
-				oDistVector = oDistVector / (GetVectorLength(oDistVector) == 0 ? 1 : GetVectorLength(oDistVector)) * 75;
+				oDistVector = oDistVector * 1000; // / (GetVectorLength(oDistVector) == 0 ? 1 : GetVectorLength(oDistVector)) * 75;
 				cv::Scalar color = cv::Scalar(rng.uniform(0,255), rng.uniform(0,255), rng.uniform(0,255));
 				cv::Point oCoordinate(nDrawMatCol, nDrawMatRow);
 				arrowedLine(oDrawMat, oCoordinate, oCoordinate + cv::Point(oDistVector), color, 5, cv::LINE_AA);
@@ -317,8 +322,8 @@ int main(int argc, char **argv)
 {
 	CreateMaps();
 
-//	CForceMapGenerator::DrawForceMap();
-//	CForceMapGenerator::DrawDistanceMap();
+	CForceMapGenerator::DrawForceMap();
+	CForceMapGenerator::DrawDistanceMap();
 
 	return(0);
 }

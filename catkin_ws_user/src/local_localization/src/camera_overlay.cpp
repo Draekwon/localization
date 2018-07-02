@@ -172,7 +172,7 @@ public:
 	cv::Mat GetRotatedImg(cv::Mat oContourImg, double fYaw)
 	{
 		// I have no idea why the following should be necessary...
-		fYaw = fYaw * 180 / M_PI - 180;
+		fYaw = fYaw * 180 / M_PI;
 		// what this does is, it converts from radians to degrees and then switches front and back.
 
 		cv::Point2f oImageCenter((oContourImg.cols - 1) / 2.0, (oContourImg.rows - 1) / 2.0);
@@ -201,8 +201,10 @@ public:
 	cv::Mat GetTransformationMatrix(int nCamWidth, int nCamHeight, int nMapWidth, int nMapHeight, cv::Point oCenter, double fYaw)
 	{
 		// I have no idea why the following should be necessary...
-		fYaw = fYaw * 180 / M_PI - 180;
+		fYaw = fYaw * 180 / M_PI;
 		// what this does is, it converts from radians to degrees and then switches front and back.
+		// front and back switch is simple: camera image is reversed.
+		// but radians -> degrees? no idea.
 
 		// turn the contour points around the image center
 		cv::Point2f oRotationCenter(nCamWidth / 2.0, nCamHeight / 2.0);
@@ -259,7 +261,7 @@ public:
 
 		oForceVector /= counter == 0 ? 1 : counter;
 		oTorque /= counter == 0 ? 1 : counter;
-		return oForceVector;
+		return oForceVector * CM_TO_M;
 	}
 
 	/**
@@ -286,6 +288,12 @@ public:
 		cvtColor(oCameraImg, oHsvImg, CV_BGR2HSV);
 		cv::Mat oRangedImg;
 		cv::inRange(oHsvImg, cv::Scalar(0, 0, 50), cv::Scalar(255, 100, 255), oRangedImg);
+
+		// flip by y axis
+		cv::Mat oFlippedImg;
+		cv::flip(oRangedImg, oFlippedImg, 1);
+		// rotate by 90 degrees
+		cv::rotate(oFlippedImg, oRangedImg, cv::ROTATE_90_COUNTERCLOCKWISE);
 
 		return oRangedImg;
 	}
@@ -328,29 +336,24 @@ public:
 		cv::Point3d oPosition = oCurrentPosePosition + oOdomPosePosition - oOldOdomPosePosition;
 		try {
 			double oTorque = 0;
-			// odom position ranges: x: 0-6; y: 0-4
-			// x is the "height" axis and y the "width" axis
-			cv::Point3d tempPoint = cv::Point3d(6, 4, 0) - oPosition;
-			tempPoint *= M_TO_CM;
-			// switch x and y so that y is the "height" and x the "width"
 			//! oCenter is the position of the car in image coordinates
-			cv::Point oCenter = cv::Point(tempPoint.y, tempPoint.x);
+			cv::Point oCenter = cv::Point(oPosition.x * M_TO_CM, oPosition.y * M_TO_CM);
 
 			cv::Mat oTransformationMat = GetTransformationMatrix(oPreparedCameraImg.cols, oPreparedCameraImg.rows,
-					m_oMapImg.cols, m_oMapImg.rows, oCenter, fDifferentialYaw);
+					m_oMapImg.cols, m_oMapImg.rows, oCenter, -fDifferentialYaw);
 			cv::Point2d oForceVector = GetForceVector(oTransformationMat, oPreparedCameraImg, oTorque, oCenter);
 
-			PublishMapOverlay(oPreparedCameraImg, fDifferentialYaw, cv::Point(oCenter));
+			PublishMapOverlay(oPreparedCameraImg, -fDifferentialYaw, cv::Point(oCenter));
 
 //			if (oTorque > 0)
 //				fDifferentialYaw += 0.1 / 180.0 * M_PI;
 //			else
 //				fDifferentialYaw -= 0.1 / 180.0 * M_PI;
-			fDifferentialYaw += oTorque / 10.0 / 180.0 * M_PI;
+			fDifferentialYaw += oTorque / 1.0 / 180.0 * M_PI;
 			std::cout << "oTorque " << oTorque << std::endl;
-			// force vectors are scaled, so that the longest one is 1m
-			// scale them down so that the longest is 1cm
-			oForceVector *= 0.01;
+			// force vectors are scaled, so that the longest one is 1cm (0.01m)
+			// dont scale them
+//			oForceVector *= 0.1;
 			std::cout << "forcevector2 " << GetVectorLength(oForceVector) << std::endl;
 			// add the force vector to the position
 			oPosition.x += std::isinf(oForceVector.x) || std::isnan(oForceVector.x) ? 0 : oForceVector.x;
@@ -390,7 +393,7 @@ public:
 int main(int argc, char **argv)
 {
 	ros::init(argc, argv, "camera_overlay");
-	CCameraOverlay oImgTest(600.0 / 1114.0);
+	CCameraOverlay oImgTest(67.0 / 144.0);
 	ros::spin();
 	return 0;
 }
