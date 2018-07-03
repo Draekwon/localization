@@ -46,6 +46,7 @@ class CCameraOverlay
 	geometry_msgs::Pose m_oOldOdomPose;
 	geometry_msgs::Pose m_oCurrentPose;
 
+
 	ros::Publisher vis_pub;
 
 	cv::Mat m_oMapImg;
@@ -98,7 +99,7 @@ public:
 
 		// Subscribe to input video feed
 		m_oImageSub = m_oImgTransport.subscribe("/usb_cam/image_undistorted", 1,
-		  &CCameraOverlay::ImageCallback, this);
+		  &CCameraOverlay::ImageCallback, this, image_transport::TransportHints("compressed"));
 		m_oOdomSub = m_oNodeHandle.subscribe("/odom", 1, &CCameraOverlay::OdomCallback, this);
 	}
 
@@ -259,7 +260,8 @@ public:
 			}
 		}
 
-		oForceVector /= counter == 0 ? 1 : counter;
+		oForceVector /= counter == 0 ? 1
+				: counter;
 		oTorque /= counter == 0 ? 1 : counter;
 		return oForceVector * CM_TO_M;
 	}
@@ -353,7 +355,7 @@ public:
 			std::cout << "oTorque " << oTorque << std::endl;
 			// force vectors are scaled, so that the longest one is 1cm (0.01m)
 			// dont scale them
-//			oForceVector *= 0.1;
+			oForceVector *= 100;
 			std::cout << "forcevector2 " << GetVectorLength(oForceVector) << std::endl;
 			// add the force vector to the position
 			oPosition.x += std::isinf(oForceVector.x) || std::isnan(oForceVector.x) ? 0 : oForceVector.x;
@@ -373,6 +375,7 @@ public:
 
 			//set the position
 			odom.pose.pose = m_oCurrentPose;
+
 
 			//set the velocityoPreparedCameraImg
 	//		odom.child_frame_id = "base_link";
