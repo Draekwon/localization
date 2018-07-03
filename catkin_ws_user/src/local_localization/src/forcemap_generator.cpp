@@ -79,7 +79,7 @@ private:
 		for (int y = 0; y < MAP_SIZE.height; y++)
 		{
 			// nRow, nCol are pixel coordinate on WorkingMat
-			int nRow = nStartingOffset + 10 * y;
+			int nRow = nStartingOffset + 10 * y; // 10 cm steps
 			for (int x = 0; x < MAP_SIZE.width; x++)
 			{
 				int nCol = nStartingOffset + 10 * x;
@@ -98,6 +98,11 @@ private:
 					double fWeight = exp(fDistanceOuter / EXP_CONST) / fDividentSum;
 					oWeightMap.at<double>(y, x, nContOuter) = fWeight;
 				}
+
+
+
+
+
 			}
 			std::cout << "weightmap (nRow): (" << nRow << ")" << std::endl;
 		}
@@ -155,9 +160,14 @@ private:
 					fLargestForce = GetVectorLength(m_oForceMap.at<cv::Point2d>(y, x));
 				if (GetVectorLength(m_oDistanceMap.at<cv::Point2d>(y, x)) > fLongestDistance)
 					fLongestDistance = GetVectorLength(m_oDistanceMap.at<cv::Point2d>(y, x));
-				if (std::isinf(fLongestDistance))
+				if (std::isinf(fLongestDistance) || std::isnan(fLongestDistance))
 				{
-					std::cout << x << " " << y << " " << m_oDistanceMap.at<cv::Point2d>(y, x) << fLongestDistance << std::endl;
+					std::cout << x << " " << y << " dist " << m_oDistanceMap.at<cv::Point2d>(y, x) << fLongestDistance << std::endl;
+					exit(-1);
+				}
+				if (std::isinf(fLargestForce) || std::isnan(fLargestForce))
+				{
+					std::cout << x << " " << y << " force " << m_oDistanceMap.at<cv::Point2d>(y, x) << fLargestForce << std::endl;
 					exit(-1);
 				}
 			}
@@ -165,6 +175,10 @@ private:
 		m_oForceMap /= fLargestForce;
 		m_oDistanceMap /= fLongestDistance;
 	}
+
+
+
+
 
 public:
 
@@ -254,8 +268,9 @@ public:
 				int nDMatRow = 50 + nFMapRow * 100;
 
 				cv::Point2d oForceVector = oForceMap.at<cv::Point2d>(nFMapRow, nFMapCol);
-				oForceVector = oForceVector * 1000; // / (GetVectorLength(oForceVector) == 0 ? 1 : GetVectorLength(oForceVector)) * 75;
-				cv::Scalar color = cv::Scalar(rng.uniform(0,255), rng.uniform(0,255), rng.uniform(0,255));
+				oForceVector = oForceVector / (GetVectorLength(oForceVector) == 0 ? 1 : GetVectorLength(oForceVector)) * 75;
+				std::cout << GetVectorLength(oForceVector) << ", " << (GetVectorLength(oForceVector) == 0) << std::endl;
+				cv::Scalar color = cv::Scalar(0,0,255);//rng.uniform(0,255), rng.uniform(0,255), rng.uniform(0,255));
 				cv::Point oCoordinate(nDMatCol, nDMatRow);
 				arrowedLine(oDrawMat, oCoordinate, oCoordinate + cv::Point(oForceVector), color, 5, cv::LINE_AA);
 			}
@@ -305,6 +320,23 @@ void CreateMaps()
 	std::string sImagePath = ros::package::getPath(PACKAGE_NAME) + "/images/";
 	std::string sImageName("Lab_map_600x400.png");
 	cv::Mat src = imread(sImagePath + sImageName, cv::IMREAD_GRAYSCALE);
+
+
+    // Create LSD detector
+    cv::Ptr<cv::LineSegmentDetector> lsd = cv::createLineSegmentDetector();
+
+    std::vector<cv::Vec4f> lines_lsd;
+    lsd->detect(src, lines_lsd);
+    // Show found lines with LSD
+    cv::Mat line_image_lsd(src.rows, src.cols, CV_8UC3);
+    lsd->drawSegments(line_image_lsd, lines_lsd);
+
+    cv::namedWindow("LSD", CV_WINDOW_NORMAL);
+    imshow("LSD", line_image_lsd);
+    cv::waitKey(0);
+
+    exit(10);
+
 	if (src.empty())
 	{
 		std::cerr << "No image supplied ..." << std::endl;
@@ -322,8 +354,8 @@ int main(int argc, char **argv)
 {
 	CreateMaps();
 
-	CForceMapGenerator::DrawForceMap();
-	CForceMapGenerator::DrawDistanceMap();
+//	CForceMapGenerator::DrawForceMap();
+//	CForceMapGenerator::DrawDistanceMap();
 
 	return(0);
 }

@@ -356,7 +356,7 @@ public:
 			// force vectors are scaled, so that the longest one is 1cm (0.01m)
 			// dont scale them
 			oForceVector *= 100;
-			std::cout << "forcevector2 " << GetVectorLength(oForceVector) << std::endl;
+			std::cout << "forcevector length " << GetVectorLength(oForceVector) << std::endl;
 			// add the force vector to the position
 			oPosition.x += std::isinf(oForceVector.x) || std::isnan(oForceVector.x) ? 0 : oForceVector.x;
 			oPosition.y += std::isinf(oForceVector.y) || std::isnan(oForceVector.y) ? 0 : oForceVector.y;
