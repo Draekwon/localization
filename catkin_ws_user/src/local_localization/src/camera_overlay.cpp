@@ -245,15 +245,15 @@ public:
 					oValueMat = oTransMat * oValueMat;
 					cv::Point oMapCoordinate = cv::Point2d(oValueMat) / fMapUnit;
 
-					cv::Rect rect(cv::Point(), m_oDistanceMap.size());
+					cv::Rect rect(cv::Point(), m_oForceMap.size());
 					if (!rect.contains(oMapCoordinate))
 					{
 						continue;
 					}
 
-					oForceVector += m_oDistanceMap.at<cv::Point2d>(oMapCoordinate.y, oMapCoordinate.x);
+					oForceVector += m_oForceMap.at<cv::Point2d>(oMapCoordinate.y, oMapCoordinate.x);
 					cv::Point2d distanceVec = cv::Point2d(oValueMat.at<double>(0) - oCenter.x, oValueMat.at<double>(1) - oCenter.y);
-					oTorque += distanceVec.cross(m_oDistanceMap.at<cv::Point2d>(oMapCoordinate.y, oMapCoordinate.x));
+					oTorque += distanceVec.cross(m_oForceMap.at<cv::Point2d>(oMapCoordinate.y, oMapCoordinate.x));
 
 					counter++;
 				}
@@ -347,15 +347,16 @@ public:
 
 			PublishMapOverlay(oPreparedCameraImg, -fDifferentialYaw, cv::Point(oCenter));
 
-//			if (oTorque > 0)
-//				fDifferentialYaw += 0.1 / 180.0 * M_PI;
-//			else
-//				fDifferentialYaw -= 0.1 / 180.0 * M_PI;
-			fDifferentialYaw += oTorque / 1.0 / 180.0 * M_PI;
+			if (oTorque > 0)
+				fDifferentialYaw += 1.0 / 3 / 180.0 * M_PI;
+			else
+				fDifferentialYaw -= 1.0 / 3 / 180.0 * M_PI;
+//			fDifferentialYaw += oTorque / 10.0 / 180.0 * M_PI;
 			std::cout << "oTorque " << oTorque << std::endl;
 			// force vectors are scaled, so that the longest one is 1cm (0.01m)
-			// dont scale them
-			oForceVector *= 100;
+			// scale them
+			oForceVector /= GetVectorLength(oForceVector);
+			oForceVector *= 0.01; // 1cm
 			std::cout << "forcevector length " << GetVectorLength(oForceVector) << std::endl;
 			// add the force vector to the position
 			oPosition.x += std::isinf(oForceVector.x) || std::isnan(oForceVector.x) ? 0 : oForceVector.x;

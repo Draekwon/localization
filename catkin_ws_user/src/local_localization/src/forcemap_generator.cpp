@@ -49,29 +49,24 @@ private:
 		m_oForceMap = cv::Mat2d::zeros(MAP_SIZE.height, MAP_SIZE.width);
 		m_oDistanceMap = cv::Mat2d::zeros(MAP_SIZE.height, MAP_SIZE.width);
 
-		// get the contours
-		std::vector<std::vector<cv::Point> > contours;
-		std::vector<cv::Vec4i> hierarchy;
-		cv::findContours( oWorkingMat, contours, hierarchy, CV_RETR_LIST, cv::CHAIN_APPROX_NONE, cv::Point(0, 0) );
+	    // Create LineSegmentDetector
+	    cv::Ptr<cv::LineSegmentDetector> pLsd = cv::createLineSegmentDetector();
+	    std::vector<cv::Vec4f> aLsdLines;
+	    pLsd->detect(oWorkingMat, aLsdLines);
+		std::cout << "line count: " << aLsdLines.size() << std::endl;
 
-		// visualization
-	    cv::Mat oContourImg = cv::Mat::zeros( oWorkingMat.size(), CV_8UC1);
-//		for( size_t i = 0; i< contours.size(); i++ )
-//		{
-//			cv::Scalar color = cv::Scalar( 255 );
-//			drawContours( oContourImg, contours, (int)i, color, 1, 8, hierarchy, 0, cv::Point() );
-//		}
 
-//		cv::namedWindow("kek", cv::WINDOW_NORMAL);
-//		imshow("kek", oWorkingMat);
-//		cv::waitKey(0);
-//		imshow("kek", oContourImg);
-//		cv::waitKey(0);
-//		exit(0);
+	    // visualization
+//	    cv::Mat oLineImg(oWorkingMat.rows, oWorkingMat.cols, CV_8UC3);
+//	    pLsd->drawSegments(oLineImg, aLsdLines);
+//	    cv::namedWindow("LSD", CV_WINDOW_NORMAL);
+//	    imshow("LSD", oLineImg);
+//	    cv::waitKey(0);
+//	    exit(10);
 
-		std::cout << "contour count: " << contours.size() << std::endl;
+
 		// create empty weight map
-		int aSizes[] = {MAP_SIZE.height, MAP_SIZE.width, contours.size()};
+		int aSizes[] = {MAP_SIZE.height, MAP_SIZE.width, aLsdLines.size()};
 		cv::Mat oWeightMap(3, aSizes, CV_64FC1, cv::Scalar(0));
 
 		int nStartingOffset = 4;
@@ -84,25 +79,27 @@ private:
 			{
 				int nCol = nStartingOffset + 10 * x;
 
-				// get distances to every contour and sum them up
-				for (int nContOuter = 0; nContOuter < contours.size(); nContOuter++)
+				// for every line segment
+				for (int nLineSegment = 0; nLineSegment < aLsdLines.size(); nLineSegment++)
 				{
 					double fDividentSum = 0;
-					for (int nCont = 0; nCont < contours.size(); nCont++)
+
+					// get distances to every line segment and sum them up
+					for (int nInnerLineSegment = 0; nInnerLineSegment < aLsdLines.size(); nInnerLineSegment++)
 					{
 						// pixel distance
-						double fDistance = fabs(pointPolygonTest(contours[nCont], cv::Point2d(nCol, nRow), true));
+						cv::Point2f oInnerLineStart(aLsdLines.at(nInnerLineSegment).val[0], aLsdLines.at(nInnerLineSegment).val[1]);
+						cv::Point2f oInnerLineEnd(aLsdLines.at(nInnerLineSegment).val[2], aLsdLines.at(nInnerLineSegment).val[3]);
+						double fDistance = GetVectorLength(GetShortestVectorToLine(oWorkingMat, cv::Point(nCol, nRow), oInnerLineStart, oInnerLineEnd));
 						fDividentSum += exp(-fDistance / EXP_CONST);
 					}
-					double fDistanceOuter = fabs(pointPolygonTest(contours[nContOuter], cv::Point2d(nCol, nRow), true));
-					double fWeight = exp(fDistanceOuter / EXP_CONST) / fDividentSum;
-					oWeightMap.at<double>(y, x, nContOuter) = fWeight;
+					// and save the formula in the array
+					cv::Point2f oLineStart(aLsdLines.at(nLineSegment).val[0], aLsdLines.at(nLineSegment).val[1]);
+					cv::Point2f oLineEnd(aLsdLines.at(nLineSegment).val[2], aLsdLines.at(nLineSegment).val[3]);
+					double fDistanceOuter = GetVectorLength(GetShortestVectorToLine(oWorkingMat, cv::Point(nCol, nRow), oLineStart, oLineEnd));
+					double fWeight = exp(-fDistanceOuter / EXP_CONST) / fDividentSum;
+					oWeightMap.at<double>(y, x, nLineSegment) = fWeight;
 				}
-
-
-
-
-
 			}
 			std::cout << "weightmap (nRow): (" << nRow << ")" << std::endl;
 		}
@@ -110,38 +107,34 @@ private:
 		// these loops calculate the actual force vectors as in the paper p.5
 		for (int y = 0; y < MAP_SIZE.height; y++)
 		{
-			// nRow, nCol are pixel coordinate on WorkingMat
+			// nRow, nCol are pixel coordinates on WorkingMat
 			int nRow = nStartingOffset + 10 * y;
 			for (int x = 0; x < MAP_SIZE.width; x++)
 			{
 				int nCol = nStartingOffset + 10 * x;
 
 				// initialize distancemap on first value for the comparison later
-				m_oDistanceMap.at<cv::Point2d>(y, x) = cv::Point2d(contours[0][0] - cv::Point(nCol, nRow));
-				cv::Point2d oForceVector(0,0);
-				// brute-force-find the closest point / shortest vector of a contour:
-				// iterate through contours
-				for (int nCont = 0; nCont < contours.size(); nCont++)
-				{
-					// initialize on first number
-					double fMinDistance = GetDistance(contours[nCont][0], cv::Point(nCol, nRow));
-					cv::Point2d oMinVector = cv::Point2d(contours[nCont][0] - cv::Point(nCol, nRow));
+				cv::Point2f oLineStart(aLsdLines.at(0).val[0], aLsdLines.at(0).val[1]);
+				cv::Point2f oLineEnd(aLsdLines.at(0).val[2], aLsdLines.at(0).val[3]);
+				m_oDistanceMap.at<cv::Point2d>(y, x) = GetShortestVectorToLine(oWorkingMat, cv::Point(nCol, nRow), oLineStart, oLineEnd);
 
-					// iterate through pixels in the contour (skip first)
-					for (int nPixelCount = 1; nPixelCount < contours[nCont].size(); nPixelCount++)
-					{
-						double fDist = GetDistance(contours[nCont][nPixelCount], cv::Point(nCol, nRow));
-						if (fDist < fMinDistance)
-						{
-							fMinDistance = fDist;
-							oMinVector = cv::Point2d(contours[nCont][nPixelCount] - cv::Point(nCol, nRow));
-						}
-					}
+				cv::Point2d oForceVector = oWeightMap.at<double>(y, x, 0) * m_oDistanceMap.at<cv::Point2d>(y, x);
+
+
+				// brute-force-find the closest point / shortest vector of a contour:
+				// iterate through line segments, skipping the first
+				for (int nLineSegment = 1; nLineSegment < aLsdLines.size(); nLineSegment++)
+				{
+					oLineStart = cv::Point(aLsdLines.at(nLineSegment).val[0], aLsdLines.at(nLineSegment).val[1]);
+					oLineEnd = cv::Point(aLsdLines.at(nLineSegment).val[2], aLsdLines.at(nLineSegment).val[3]);
+					cv::Point2d oMinVector = GetShortestVectorToLine(oWorkingMat, cv::Point(nCol, nRow), oLineStart, oLineEnd);
+					double fMinDistance = GetVectorLength(oMinVector);
+
 					if (fMinDistance < GetVectorLength(m_oDistanceMap.at<cv::Point2d>(y, x)))
 					{
 						m_oDistanceMap.at<cv::Point2d>(y, x) = oMinVector;
 					}
-					oForceVector += oWeightMap.at<double>(y, x, nCont) * oMinVector;
+					oForceVector += oWeightMap.at<double>(y, x, nLineSegment) * oMinVector;
 				}
 				m_oForceMap.at<cv::Point2d>(y, x) = oForceVector;
 
@@ -176,7 +169,31 @@ private:
 		m_oDistanceMap /= fLongestDistance;
 	}
 
-
+/**
+ * calculates the shortest distance vector between a point and a line on an image
+ * @param oWorkingMat	image the line and point are on
+ * @param oPoint		the point
+ * @param oLineStart	starting point of the line
+ * @param oLineEnd		ending point of the line
+ * @return				vector from the given point to the nearest point on the line
+ */
+	cv::Point2d GetShortestVectorToLine(cv::Mat oImg, cv::Point oPoint, cv::Point2f oLineStart, cv::Point2f oLineEnd)
+	{
+		cv::LineIterator oIterator(oImg, oLineStart, oLineEnd);
+		double fMinLength = GetDistance(oPoint, oIterator.pos());
+		cv::Point2d oShortestVector = oIterator.pos() - oPoint;
+		oIterator++;
+		for (int i = 1; i < oIterator.count; ++i, ++oIterator)
+		{
+			double fCurrentLength = GetDistance(oPoint, oIterator.pos());
+			if (fCurrentLength < fMinLength)
+			{
+				fMinLength = fCurrentLength;
+				oShortestVector = cv::Point2d(oIterator.pos() - oPoint);
+			}
+		}
+		return oShortestVector;
+	}
 
 
 
@@ -268,9 +285,8 @@ public:
 				int nDMatRow = 50 + nFMapRow * 100;
 
 				cv::Point2d oForceVector = oForceMap.at<cv::Point2d>(nFMapRow, nFMapCol);
-				oForceVector = oForceVector / (GetVectorLength(oForceVector) == 0 ? 1 : GetVectorLength(oForceVector)) * 75;
-				std::cout << GetVectorLength(oForceVector) << ", " << (GetVectorLength(oForceVector) == 0) << std::endl;
-				cv::Scalar color = cv::Scalar(0,0,255);//rng.uniform(0,255), rng.uniform(0,255), rng.uniform(0,255));
+				oForceVector = oForceVector * 1000; // / (GetVectorLength(oForceVector) == 0 ? 1 : GetVectorLength(oForceVector)) * 75;
+				cv::Scalar color = cv::Scalar(0,0,255);
 				cv::Point oCoordinate(nDMatCol, nDMatRow);
 				arrowedLine(oDrawMat, oCoordinate, oCoordinate + cv::Point(oForceVector), color, 5, cv::LINE_AA);
 			}
@@ -301,7 +317,7 @@ public:
 
 				cv::Point2d oDistVector = oDistanceMap.at<cv::Point2d>(nDMapRow, nDMapCol);
 				oDistVector = oDistVector * 1000; // / (GetVectorLength(oDistVector) == 0 ? 1 : GetVectorLength(oDistVector)) * 75;
-				cv::Scalar color = cv::Scalar(rng.uniform(0,255), rng.uniform(0,255), rng.uniform(0,255));
+				cv::Scalar color = cv::Scalar(0,0,255);
 				cv::Point oCoordinate(nDrawMatCol, nDrawMatRow);
 				arrowedLine(oDrawMat, oCoordinate, oCoordinate + cv::Point(oDistVector), color, 5, cv::LINE_AA);
 			}
@@ -321,22 +337,6 @@ void CreateMaps()
 	std::string sImageName("Lab_map_600x400.png");
 	cv::Mat src = imread(sImagePath + sImageName, cv::IMREAD_GRAYSCALE);
 
-
-    // Create LSD detector
-    cv::Ptr<cv::LineSegmentDetector> lsd = cv::createLineSegmentDetector();
-
-    std::vector<cv::Vec4f> lines_lsd;
-    lsd->detect(src, lines_lsd);
-    // Show found lines with LSD
-    cv::Mat line_image_lsd(src.rows, src.cols, CV_8UC3);
-    lsd->drawSegments(line_image_lsd, lines_lsd);
-
-    cv::namedWindow("LSD", CV_WINDOW_NORMAL);
-    imshow("LSD", line_image_lsd);
-    cv::waitKey(0);
-
-    exit(10);
-
 	if (src.empty())
 	{
 		std::cerr << "No image supplied ..." << std::endl;
@@ -352,10 +352,10 @@ void CreateMaps()
 
 int main(int argc, char **argv)
 {
-	CreateMaps();
+//	CreateMaps();
 
-//	CForceMapGenerator::DrawForceMap();
-//	CForceMapGenerator::DrawDistanceMap();
+	CForceMapGenerator::DrawForceMap();
+	CForceMapGenerator::DrawDistanceMap();
 
 	return(0);
 }
