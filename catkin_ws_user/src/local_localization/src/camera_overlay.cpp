@@ -55,6 +55,7 @@ class CCameraOverlay
 
 	ros::Subscriber m_oOdomSub;
 
+	bool 	m_bPublishOverlay;
 	double	m_fScaleFactor;
 
 	std::string m_sWindowName = "CamOverlay";
@@ -64,9 +65,10 @@ public:
 	/**
 	 * subscribes to /odom and /usb_cam/image_undistorted and publishes /MATRIX_Location (odometry) and /camera_overlay (image)
 	 * @param fScaleFactor		scales the camera image so that 1px = 1cm
+	 * @param bPublishOverlay	sets publishing of overlay to true or false
 	 */
-	CCameraOverlay(double fScaleFactor)
-	: m_oImgTransport(m_oNodeHandle), m_fScaleFactor(fScaleFactor)
+	CCameraOverlay(double fScaleFactor, bool bPublishOverlay = true)
+	: m_oImgTransport(m_oNodeHandle), m_fScaleFactor(fScaleFactor), m_bPublishOverlay(bPublishOverlay)
 	{
 		std::string sImagePath = ros::package::getPath(PACKAGE_NAME) + "/images/";
 		std::string sMapPath = ros::package::getPath(PACKAGE_NAME) + "/mapTables/";
@@ -95,7 +97,8 @@ public:
 
 		// publish a position by publishing odometry
 		m_oOdomPub = m_oNodeHandle.advertise<nav_msgs::Odometry>("MATRIX_Location", 50);
-		m_oImagePub = m_oImgTransport.advertise("/camera_overlay", 1);
+		if (m_bPublishOverlay)
+			m_oImagePub = m_oImgTransport.advertise("/camera_overlay", 1);
 
 		// Subscribe to input video feed
 		m_oImageSub = m_oImgTransport.subscribe("/usb_cam/image_undistorted", 1,
@@ -227,8 +230,6 @@ public:
 	 */
 	cv::Point2d GetForceVector(cv::Mat oTransMat, cv::Mat oImg, double &oTorque, cv::Point oCenter)
 	{
-		const double fMapUnit = 10; //10 cm
-
 		cv::Point2d oForceVector(0,0);
 		int counter = 0;
 
@@ -243,7 +244,7 @@ public:
 					oValueMat.at<double>(1) = y;
 					oValueMat.at<double>(2) = 1;
 					oValueMat = oTransMat * oValueMat;
-					cv::Point oMapCoordinate = cv::Point2d(oValueMat) / fMapUnit;
+					cv::Point oMapCoordinate = cv::Point2d(oValueMat) / VECTOR_FIELD_DISTANCE;
 
 					cv::Rect rect(cv::Point(), m_oForceMap.size());
 					if (!rect.contains(oMapCoordinate))
@@ -345,7 +346,8 @@ public:
 					m_oMapImg.cols, m_oMapImg.rows, oCenter, -fDifferentialYaw);
 			cv::Point2d oForceVector = GetForceVector(oTransformationMat, oPreparedCameraImg, oTorque, oCenter);
 
-			PublishMapOverlay(oPreparedCameraImg, -fDifferentialYaw, cv::Point(oCenter));
+			if (m_bPublishOverlay)
+				PublishMapOverlay(oPreparedCameraImg, -fDifferentialYaw, cv::Point(oCenter));
 
 			if (oTorque > 0)
 				fDifferentialYaw += 1.0 / 3 / 180.0 * M_PI;
@@ -376,10 +378,6 @@ public:
 
 			//set the position
 			odom.pose.pose = m_oCurrentPose;
-
-
-			//set the velocityoPreparedCameraImg
-	//		odom.child_frame_id = "base_link";
 
 			//publish the message
 			m_oOdomPub.publish(odom);
