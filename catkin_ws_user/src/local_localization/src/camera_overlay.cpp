@@ -34,6 +34,11 @@
 #include "utility.h"
 
 
+/**
+ * This class subscribes to the /odom and /usb_cam/image_undistorted topics
+ * to apply the MATRIX-algorithm and publish a new /MATRIX_Location
+ * topic, as odometry.
+ */
 class CCameraOverlay
 {
 	ros::NodeHandle m_oNodeHandle;
@@ -210,7 +215,7 @@ public:
 		// front and back switch is simple: camera image is reversed.
 		// but radians -> degrees? no idea.
 
-		// turn the contour points around the image center
+		// turn the image points around the image center
 		cv::Point2f oRotationCenter(nCamWidth / 2.0, nCamHeight / 2.0);
 		cv::Mat oRotMat = getRotationMatrix2D(oRotationCenter, fYaw, 1.0);
 		// add a translation to the matrix
@@ -244,17 +249,17 @@ public:
 					oValueMat.at<double>(1) = y;
 					oValueMat.at<double>(2) = 1;
 					oValueMat = oTransMat * oValueMat;
-					cv::Point oMapCoordinate = cv::Point2d(oValueMat) / VECTOR_FIELD_DISTANCE;
+					cv::Point oVectorFieldCoordinate = cv::Point2d(oValueMat) / VECTOR_FIELD_DISTANCE;
 
 					cv::Rect rect(cv::Point(), m_oForceMap.size());
-					if (!rect.contains(oMapCoordinate))
+					if (!rect.contains(oVectorFieldCoordinate))
 					{
 						continue;
 					}
 
-					oForceVector += m_oForceMap.at<cv::Point2d>(oMapCoordinate.y, oMapCoordinate.x);
+					oForceVector += m_oForceMap.at<cv::Point2d>(oVectorFieldCoordinate.y, oVectorFieldCoordinate.x);
 					cv::Point2d distanceVec = cv::Point2d(oValueMat.at<double>(0) - oCenter.x, oValueMat.at<double>(1) - oCenter.y);
-					oTorque += distanceVec.cross(m_oForceMap.at<cv::Point2d>(oMapCoordinate.y, oMapCoordinate.x));
+					oTorque += distanceVec.cross(m_oForceMap.at<cv::Point2d>(oVectorFieldCoordinate.y, oVectorFieldCoordinate.x));
 
 					counter++;
 				}
@@ -350,8 +355,10 @@ public:
 				PublishMapOverlay(oPreparedCameraImg, -fDifferentialYaw, cv::Point(oCenter));
 
 			if (oTorque > 0)
+				// + 1 degree
 				fDifferentialYaw += 1.0 / 3 / 180.0 * M_PI;
 			else
+				// - 1 degree
 				fDifferentialYaw -= 1.0 / 3 / 180.0 * M_PI;
 //			fDifferentialYaw += oTorque / 10.0 / 180.0 * M_PI;
 			std::cout << "oTorque " << oTorque << std::endl;
