@@ -85,7 +85,6 @@ public:
 	 * this method iterates through the given image multiple times to build a distance- and a force-potential field
 	 * a scale factor of 1px = 1cm is assumed
 	 * !this takes a long time!
-	 * @param fResolution	the resolution factor of the original picture the vector field should be generated at
 	 */
 	void CreateVectorFields()
 	{

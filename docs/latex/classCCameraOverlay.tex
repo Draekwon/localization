@@ -1,0 +1,159 @@
+\hypertarget{classCCameraOverlay}{}\section{C\+Camera\+Overlay Class Reference}
+\label{classCCameraOverlay}\index{C\+Camera\+Overlay@{C\+Camera\+Overlay}}
+\subsection*{Public Member Functions}
+\begin{DoxyCompactItemize}
+\item 
+\hyperlink{classCCameraOverlay_af3bb4a64b788a48193a5bcf32ec9c48e}{C\+Camera\+Overlay} (double f\+Scale\+Factor, bool b\+Publish\+Overlay=true)
+\item 
+void \hyperlink{classCCameraOverlay_afacf6244e298a21c4f66cce388a1bba5}{Odom\+Callback} (const nav\+\_\+msgs\+::\+Odometry\+Const\+Ptr \&msg)
+\item 
+void \hyperlink{classCCameraOverlay_a181273515ad4fad3afeb0af94b4a8b9b}{Publish\+Map\+Overlay} (cv\+::\+Mat o\+Contour\+Img, double f\+Yaw, cv\+::\+Point o\+Center)
+\item 
+cv\+::\+Mat \hyperlink{classCCameraOverlay_a049c9d62c19daa861a64719c4ef6d741}{Get\+Rotated\+Img} (cv\+::\+Mat o\+Contour\+Img, double f\+Yaw)
+\item 
+cv\+::\+Mat \hyperlink{classCCameraOverlay_a84b8dfa74a28656b41b6701bc8c0876e}{Get\+Transformation\+Matrix} (int n\+Cam\+Width, int n\+Cam\+Height, int n\+Map\+Width, int n\+Map\+Height, cv\+::\+Point o\+Center, double f\+Yaw)
+\item 
+cv\+::\+Point2d \hyperlink{classCCameraOverlay_a36f4f263b03af8e1ceb0ed4c1e254316}{Get\+Force\+Vector} (cv\+::\+Mat o\+Trans\+Mat, cv\+::\+Mat o\+Img, double \&o\+Torque, cv\+::\+Point o\+Center)
+\item 
+cv\+::\+Mat \hyperlink{classCCameraOverlay_a487dec7bb2107637a0a5a98b343de7ff}{Prepare\+Camera\+Image} (cv\+::\+Mat o\+Camera\+Img)
+\item 
+void \hyperlink{classCCameraOverlay_aebf5afaca8892eb5af9c90531675427b}{Image\+Callback} (const sensor\+\_\+msgs\+::\+Image\+Const\+Ptr \&msg)
+\end{DoxyCompactItemize}
+
+
+\subsection{Detailed Description}
+This class subscribes to the /odom and /usb\+\_\+cam/image\+\_\+undistorted topics to apply the M\+A\+T\+R\+I\+X-\/algorithm and publish a new /\+M\+A\+T\+R\+I\+X\+\_\+\+Location topic, as odometry. 
+
+\subsection{Constructor \& Destructor Documentation}
+\mbox{\Hypertarget{classCCameraOverlay_af3bb4a64b788a48193a5bcf32ec9c48e}\label{classCCameraOverlay_af3bb4a64b788a48193a5bcf32ec9c48e}} 
+\index{C\+Camera\+Overlay@{C\+Camera\+Overlay}!C\+Camera\+Overlay@{C\+Camera\+Overlay}}
+\index{C\+Camera\+Overlay@{C\+Camera\+Overlay}!C\+Camera\+Overlay@{C\+Camera\+Overlay}}
+\subsubsection{\texorpdfstring{C\+Camera\+Overlay()}{CCameraOverlay()}}
+{\footnotesize\ttfamily C\+Camera\+Overlay\+::\+C\+Camera\+Overlay (\begin{DoxyParamCaption}\item[{double}]{f\+Scale\+Factor,  }\item[{bool}]{b\+Publish\+Overlay = {\ttfamily true} }\end{DoxyParamCaption})\hspace{0.3cm}{\ttfamily [inline]}}
+
+subscribes to /odom and /usb\+\_\+cam/image\+\_\+undistorted and publishes /\+M\+A\+T\+R\+I\+X\+\_\+\+Location (odometry) and /camera\+\_\+overlay (image) 
+\begin{DoxyParams}{Parameters}
+{\em f\+Scale\+Factor} & scales the camera image so that 1px = 1cm \\
+\hline
+{\em b\+Publish\+Overlay} & sets publishing of overlay to true or false \\
+\hline
+\end{DoxyParams}
+
+
+\subsection{Member Function Documentation}
+\mbox{\Hypertarget{classCCameraOverlay_a36f4f263b03af8e1ceb0ed4c1e254316}\label{classCCameraOverlay_a36f4f263b03af8e1ceb0ed4c1e254316}} 
+\index{C\+Camera\+Overlay@{C\+Camera\+Overlay}!Get\+Force\+Vector@{Get\+Force\+Vector}}
+\index{Get\+Force\+Vector@{Get\+Force\+Vector}!C\+Camera\+Overlay@{C\+Camera\+Overlay}}
+\subsubsection{\texorpdfstring{Get\+Force\+Vector()}{GetForceVector()}}
+{\footnotesize\ttfamily cv\+::\+Point2d C\+Camera\+Overlay\+::\+Get\+Force\+Vector (\begin{DoxyParamCaption}\item[{cv\+::\+Mat}]{o\+Trans\+Mat,  }\item[{cv\+::\+Mat}]{o\+Img,  }\item[{double \&}]{o\+Torque,  }\item[{cv\+::\+Point}]{o\+Center }\end{DoxyParamCaption})\hspace{0.3cm}{\ttfamily [inline]}}
+
+uses a transformationmatrix to map image pixels to the force field and returns the average of the force vectors 
+\begin{DoxyParams}{Parameters}
+{\em o\+Trans\+Mat} & transformation matrix \\
+\hline
+{\em o\+Img} & image \\
+\hline
+{\em o\+Torque} & the torque calculated by using the 2\+D-\/cross product. It will be saved in this var. \\
+\hline
+{\em o\+Center} & the assumed position of the car \\
+\hline
+\end{DoxyParams}
+\begin{DoxyReturn}{Returns}
+the averaged force vector 
+\end{DoxyReturn}
+\mbox{\Hypertarget{classCCameraOverlay_a049c9d62c19daa861a64719c4ef6d741}\label{classCCameraOverlay_a049c9d62c19daa861a64719c4ef6d741}} 
+\index{C\+Camera\+Overlay@{C\+Camera\+Overlay}!Get\+Rotated\+Img@{Get\+Rotated\+Img}}
+\index{Get\+Rotated\+Img@{Get\+Rotated\+Img}!C\+Camera\+Overlay@{C\+Camera\+Overlay}}
+\subsubsection{\texorpdfstring{Get\+Rotated\+Img()}{GetRotatedImg()}}
+{\footnotesize\ttfamily cv\+::\+Mat C\+Camera\+Overlay\+::\+Get\+Rotated\+Img (\begin{DoxyParamCaption}\item[{cv\+::\+Mat}]{o\+Contour\+Img,  }\item[{double}]{f\+Yaw }\end{DoxyParamCaption})\hspace{0.3cm}{\ttfamily [inline]}}
+
+this method rotates the camera image for a visualization of where the camera image is related to the map 
+\begin{DoxyParams}{Parameters}
+{\em o\+Contour\+Img} & contour-\/image of the camera image \\
+\hline
+{\em f\+Yaw} & angle by which to turn the image in rad \\
+\hline
+\end{DoxyParams}
+\begin{DoxyReturn}{Returns}
+properly rotated image 
+\end{DoxyReturn}
+\mbox{\Hypertarget{classCCameraOverlay_a84b8dfa74a28656b41b6701bc8c0876e}\label{classCCameraOverlay_a84b8dfa74a28656b41b6701bc8c0876e}} 
+\index{C\+Camera\+Overlay@{C\+Camera\+Overlay}!Get\+Transformation\+Matrix@{Get\+Transformation\+Matrix}}
+\index{Get\+Transformation\+Matrix@{Get\+Transformation\+Matrix}!C\+Camera\+Overlay@{C\+Camera\+Overlay}}
+\subsubsection{\texorpdfstring{Get\+Transformation\+Matrix()}{GetTransformationMatrix()}}
+{\footnotesize\ttfamily cv\+::\+Mat C\+Camera\+Overlay\+::\+Get\+Transformation\+Matrix (\begin{DoxyParamCaption}\item[{int}]{n\+Cam\+Width,  }\item[{int}]{n\+Cam\+Height,  }\item[{int}]{n\+Map\+Width,  }\item[{int}]{n\+Map\+Height,  }\item[{cv\+::\+Point}]{o\+Center,  }\item[{double}]{f\+Yaw }\end{DoxyParamCaption})\hspace{0.3cm}{\ttfamily [inline]}}
+
+
+\begin{DoxyParams}{Parameters}
+{\em n\+Cam\+Width} & width of the camera image \\
+\hline
+{\em n\+Cam\+Height} & height of the camera image \\
+\hline
+{\em n\+Map\+Width} & width of the map \\
+\hline
+{\em n\+Map\+Height} & height of the map \\
+\hline
+{\em o\+Center} & current assumed position of the car in image coordinates \\
+\hline
+{\em f\+Yaw} & current assumed rotation of the car in radians \\
+\hline
+\end{DoxyParams}
+\begin{DoxyReturn}{Returns}
+the transformation matrix 
+\end{DoxyReturn}
+\mbox{\Hypertarget{classCCameraOverlay_aebf5afaca8892eb5af9c90531675427b}\label{classCCameraOverlay_aebf5afaca8892eb5af9c90531675427b}} 
+\index{C\+Camera\+Overlay@{C\+Camera\+Overlay}!Image\+Callback@{Image\+Callback}}
+\index{Image\+Callback@{Image\+Callback}!C\+Camera\+Overlay@{C\+Camera\+Overlay}}
+\subsubsection{\texorpdfstring{Image\+Callback()}{ImageCallback()}}
+{\footnotesize\ttfamily void C\+Camera\+Overlay\+::\+Image\+Callback (\begin{DoxyParamCaption}\item[{const sensor\+\_\+msgs\+::\+Image\+Const\+Ptr \&}]{msg }\end{DoxyParamCaption})\hspace{0.3cm}{\ttfamily [inline]}}
+
+callback for /usb\+\_\+cam/image\+\_\+undistorted. This is the main part of this class. Here, the camera image is used to improve the position the odometry returns. 
+\begin{DoxyParams}{Parameters}
+{\em msg} & The image-\/message containing the camera-\/image. \\
+\hline
+\end{DoxyParams}
+o\+Center is the position of the car in image coordinates \mbox{\Hypertarget{classCCameraOverlay_afacf6244e298a21c4f66cce388a1bba5}\label{classCCameraOverlay_afacf6244e298a21c4f66cce388a1bba5}} 
+\index{C\+Camera\+Overlay@{C\+Camera\+Overlay}!Odom\+Callback@{Odom\+Callback}}
+\index{Odom\+Callback@{Odom\+Callback}!C\+Camera\+Overlay@{C\+Camera\+Overlay}}
+\subsubsection{\texorpdfstring{Odom\+Callback()}{OdomCallback()}}
+{\footnotesize\ttfamily void C\+Camera\+Overlay\+::\+Odom\+Callback (\begin{DoxyParamCaption}\item[{const nav\+\_\+msgs\+::\+Odometry\+Const\+Ptr \&}]{msg }\end{DoxyParamCaption})\hspace{0.3cm}{\ttfamily [inline]}}
+
+this callback saves the current odometry in a class variable 
+\begin{DoxyParams}{Parameters}
+{\em msg} & the odometry-\/message \\
+\hline
+\end{DoxyParams}
+\mbox{\Hypertarget{classCCameraOverlay_a487dec7bb2107637a0a5a98b343de7ff}\label{classCCameraOverlay_a487dec7bb2107637a0a5a98b343de7ff}} 
+\index{C\+Camera\+Overlay@{C\+Camera\+Overlay}!Prepare\+Camera\+Image@{Prepare\+Camera\+Image}}
+\index{Prepare\+Camera\+Image@{Prepare\+Camera\+Image}!C\+Camera\+Overlay@{C\+Camera\+Overlay}}
+\subsubsection{\texorpdfstring{Prepare\+Camera\+Image()}{PrepareCameraImage()}}
+{\footnotesize\ttfamily cv\+::\+Mat C\+Camera\+Overlay\+::\+Prepare\+Camera\+Image (\begin{DoxyParamCaption}\item[{cv\+::\+Mat}]{o\+Camera\+Img }\end{DoxyParamCaption})\hspace{0.3cm}{\ttfamily [inline]}}
+
+scales, filters and converts the camera image to gray scale 
+\begin{DoxyParams}{Parameters}
+{\em o\+Camera\+Img} & Camera image \\
+\hline
+\end{DoxyParams}
+\begin{DoxyReturn}{Returns}
+
+\end{DoxyReturn}
+\mbox{\Hypertarget{classCCameraOverlay_a181273515ad4fad3afeb0af94b4a8b9b}\label{classCCameraOverlay_a181273515ad4fad3afeb0af94b4a8b9b}} 
+\index{C\+Camera\+Overlay@{C\+Camera\+Overlay}!Publish\+Map\+Overlay@{Publish\+Map\+Overlay}}
+\index{Publish\+Map\+Overlay@{Publish\+Map\+Overlay}!C\+Camera\+Overlay@{C\+Camera\+Overlay}}
+\subsubsection{\texorpdfstring{Publish\+Map\+Overlay()}{PublishMapOverlay()}}
+{\footnotesize\ttfamily void C\+Camera\+Overlay\+::\+Publish\+Map\+Overlay (\begin{DoxyParamCaption}\item[{cv\+::\+Mat}]{o\+Contour\+Img,  }\item[{double}]{f\+Yaw,  }\item[{cv\+::\+Point}]{o\+Center }\end{DoxyParamCaption})\hspace{0.3cm}{\ttfamily [inline]}}
+
+this method rotates and overlays the camera image on the map. the result is published to \char`\"{}/camera\+\_\+overlay\char`\"{} 
+\begin{DoxyParams}{Parameters}
+{\em o\+Contour\+Img} & the image contours of the camera image \\
+\hline
+{\em f\+Yaw} & the angle in radians \\
+\hline
+{\em o\+Center} & the assumed position of the car in pixel coordinates \\
+\hline
+\end{DoxyParams}
+
+
+The documentation for this class was generated from the following file\+:\begin{DoxyCompactItemize}
+\item 
+/home/sh/localization/catkin\+\_\+ws\+\_\+user/src/local\+\_\+localization/src/camera\+\_\+overlay.\+cpp\end{DoxyCompactItemize}

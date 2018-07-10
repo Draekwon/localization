@@ -198,14 +198,14 @@ public:
 	}
 
 	/**
-	 * this method returns a transformation matrix
-	 * that transforms the position vectors of the contour array
-	 * to the correct (pixel) positions on the map image
-	 * @param nWidth width of camera image
-	 * @param nHeight height of camera image
-	 * @param oOdomPosition current assumed position of the car in image coordinates
-	 * @param fYaw current assumed rotation of the car in radians
-	 * @return the transformation matrix
+	 *
+	 * @param nCamWidth		width of the camera image
+	 * @param nCamHeight	height of the camera image
+	 * @param nMapWidth		width of the map
+	 * @param nMapHeight	height of the map
+	 * @param oCenter		current assumed position of the car in image coordinates
+	 * @param fYaw			current assumed rotation of the car in radians
+	 * @return				the transformation matrix
 	 */
 	cv::Mat GetTransformationMatrix(int nCamWidth, int nCamHeight, int nMapWidth, int nMapHeight, cv::Point oCenter, double fYaw)
 	{

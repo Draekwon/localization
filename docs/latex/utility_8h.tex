@@ -1,0 +1,116 @@
+\hypertarget{utility_8h}{}\section{/home/sh/localization/catkin\+\_\+ws\+\_\+user/src/local\+\_\+localization/src/utility.h File Reference}
+\label{utility_8h}\index{/home/sh/localization/catkin\+\_\+ws\+\_\+user/src/local\+\_\+localization/src/utility.\+h@{/home/sh/localization/catkin\+\_\+ws\+\_\+user/src/local\+\_\+localization/src/utility.\+h}}
+{\ttfamily \#include $<$opencv2/core.\+hpp$>$}\newline
+{\ttfamily \#include $<$math.\+h$>$}\newline
+\subsection*{Functions}
+\begin{DoxyCompactItemize}
+\item 
+double \hyperlink{utility_8h_af26b9e1c6f1614a52dc1d5015c2019ac}{Get\+Distance} (cv\+::\+Point o\+P1, cv\+::\+Point o\+P2)
+\item 
+double \hyperlink{utility_8h_acb23da5d054b7b1280a2fee1c90e6742}{Get\+Distance} (cv\+::\+Point2d o\+P1, cv\+::\+Point2d o\+P2)
+\item 
+double \hyperlink{utility_8h_a3ef80774122e1366b1d70e46889c1581}{Get\+Vector\+Length} (cv\+::\+Point2d o\+Vec)
+\end{DoxyCompactItemize}
+\subsection*{Variables}
+\begin{DoxyCompactItemize}
+\item 
+const std\+::string \hyperlink{utility_8h_af150b79e07198ddc8b6be6590f175af6}{P\+A\+C\+K\+A\+G\+E\+\_\+\+N\+A\+ME} = \char`\"{}local\+\_\+localization\char`\"{}
+\item 
+const double \hyperlink{utility_8h_ab595ef5e1f1483f5ea138aa19b9ccc5a}{M\+\_\+\+T\+O\+\_\+\+CM} = 100.\+0
+\item 
+const double \hyperlink{utility_8h_a2ff8f7609d48a8da64f3ae9cd26a180a}{C\+M\+\_\+\+T\+O\+\_\+M} = 1.\+0/100.\+0
+\item 
+const int \hyperlink{utility_8h_a8d6dc4f900862e6a7495a91e1346914d}{V\+E\+C\+T\+O\+R\+\_\+\+F\+I\+E\+L\+D\+\_\+\+D\+I\+S\+T\+A\+N\+CE} = 5
+\begin{DoxyCompactList}\small\item\em grid size of the vector field compared to its original image \end{DoxyCompactList}\item 
+const cv\+::\+Size \hyperlink{utility_8h_a044f19cb7b33438d0b6a386346b8fbba}{C\+A\+R\+\_\+\+S\+I\+ZE} = cv\+::\+Size(26, 60)
+\begin{DoxyCompactList}\small\item\em car size is in cm \end{DoxyCompactList}\end{DoxyCompactItemize}
+
+
+\subsection{Function Documentation}
+\mbox{\Hypertarget{utility_8h_af26b9e1c6f1614a52dc1d5015c2019ac}\label{utility_8h_af26b9e1c6f1614a52dc1d5015c2019ac}} 
+\index{utility.\+h@{utility.\+h}!Get\+Distance@{Get\+Distance}}
+\index{Get\+Distance@{Get\+Distance}!utility.\+h@{utility.\+h}}
+\subsubsection{\texorpdfstring{Get\+Distance()}{GetDistance()}\hspace{0.1cm}{\footnotesize\ttfamily [1/2]}}
+{\footnotesize\ttfamily double Get\+Distance (\begin{DoxyParamCaption}\item[{cv\+::\+Point}]{o\+P1,  }\item[{cv\+::\+Point}]{o\+P2 }\end{DoxyParamCaption})}
+
+calculates euclidean distance between two points\+: sqrt( (P1.\+x -\/ P2.\+x)² + (P1.\+y -\/ P2.\+y)² ) 
+\begin{DoxyParams}{Parameters}
+{\em o\+P1} & Point 1 \\
+\hline
+{\em o\+P2} & Point 2 \\
+\hline
+\end{DoxyParams}
+\begin{DoxyReturn}{Returns}
+euclidean distance between the points 
+\end{DoxyReturn}
+\mbox{\Hypertarget{utility_8h_acb23da5d054b7b1280a2fee1c90e6742}\label{utility_8h_acb23da5d054b7b1280a2fee1c90e6742}} 
+\index{utility.\+h@{utility.\+h}!Get\+Distance@{Get\+Distance}}
+\index{Get\+Distance@{Get\+Distance}!utility.\+h@{utility.\+h}}
+\subsubsection{\texorpdfstring{Get\+Distance()}{GetDistance()}\hspace{0.1cm}{\footnotesize\ttfamily [2/2]}}
+{\footnotesize\ttfamily double Get\+Distance (\begin{DoxyParamCaption}\item[{cv\+::\+Point2d}]{o\+P1,  }\item[{cv\+::\+Point2d}]{o\+P2 }\end{DoxyParamCaption})}
+
+calculates euclidean distance between two points\+: sqrt( (P1.\+x -\/ P2.\+x)² + (P1.\+y -\/ P2.\+y)² ) 
+\begin{DoxyParams}{Parameters}
+{\em o\+P1} & Point2d 1 \\
+\hline
+{\em o\+P2} & Point2d 2 \\
+\hline
+\end{DoxyParams}
+\begin{DoxyReturn}{Returns}
+euclidean distance between the points 
+\end{DoxyReturn}
+\mbox{\Hypertarget{utility_8h_a3ef80774122e1366b1d70e46889c1581}\label{utility_8h_a3ef80774122e1366b1d70e46889c1581}} 
+\index{utility.\+h@{utility.\+h}!Get\+Vector\+Length@{Get\+Vector\+Length}}
+\index{Get\+Vector\+Length@{Get\+Vector\+Length}!utility.\+h@{utility.\+h}}
+\subsubsection{\texorpdfstring{Get\+Vector\+Length()}{GetVectorLength()}}
+{\footnotesize\ttfamily double Get\+Vector\+Length (\begin{DoxyParamCaption}\item[{cv\+::\+Point2d}]{o\+Vec }\end{DoxyParamCaption})}
+
+calculates length of a vector by calculating the distance between (0,0) and the Vector 
+\begin{DoxyParams}{Parameters}
+{\em o\+Vec} & Vector, represented as Point2d \\
+\hline
+\end{DoxyParams}
+\begin{DoxyReturn}{Returns}
+length of the Vector 
+\end{DoxyReturn}
+
+
+\subsection{Variable Documentation}
+\mbox{\Hypertarget{utility_8h_a044f19cb7b33438d0b6a386346b8fbba}\label{utility_8h_a044f19cb7b33438d0b6a386346b8fbba}} 
+\index{utility.\+h@{utility.\+h}!C\+A\+R\+\_\+\+S\+I\+ZE@{C\+A\+R\+\_\+\+S\+I\+ZE}}
+\index{C\+A\+R\+\_\+\+S\+I\+ZE@{C\+A\+R\+\_\+\+S\+I\+ZE}!utility.\+h@{utility.\+h}}
+\subsubsection{\texorpdfstring{C\+A\+R\+\_\+\+S\+I\+ZE}{CAR\_SIZE}}
+{\footnotesize\ttfamily const cv\+::\+Size C\+A\+R\+\_\+\+S\+I\+ZE = cv\+::\+Size(26, 60)}
+
+
+
+car size is in cm 
+
+\mbox{\Hypertarget{utility_8h_a2ff8f7609d48a8da64f3ae9cd26a180a}\label{utility_8h_a2ff8f7609d48a8da64f3ae9cd26a180a}} 
+\index{utility.\+h@{utility.\+h}!C\+M\+\_\+\+T\+O\+\_\+M@{C\+M\+\_\+\+T\+O\+\_\+M}}
+\index{C\+M\+\_\+\+T\+O\+\_\+M@{C\+M\+\_\+\+T\+O\+\_\+M}!utility.\+h@{utility.\+h}}
+\subsubsection{\texorpdfstring{C\+M\+\_\+\+T\+O\+\_\+M}{CM\_TO\_M}}
+{\footnotesize\ttfamily const double C\+M\+\_\+\+T\+O\+\_\+M = 1.\+0/100.\+0}
+
+\mbox{\Hypertarget{utility_8h_ab595ef5e1f1483f5ea138aa19b9ccc5a}\label{utility_8h_ab595ef5e1f1483f5ea138aa19b9ccc5a}} 
+\index{utility.\+h@{utility.\+h}!M\+\_\+\+T\+O\+\_\+\+CM@{M\+\_\+\+T\+O\+\_\+\+CM}}
+\index{M\+\_\+\+T\+O\+\_\+\+CM@{M\+\_\+\+T\+O\+\_\+\+CM}!utility.\+h@{utility.\+h}}
+\subsubsection{\texorpdfstring{M\+\_\+\+T\+O\+\_\+\+CM}{M\_TO\_CM}}
+{\footnotesize\ttfamily const double M\+\_\+\+T\+O\+\_\+\+CM = 100.\+0}
+
+\mbox{\Hypertarget{utility_8h_af150b79e07198ddc8b6be6590f175af6}\label{utility_8h_af150b79e07198ddc8b6be6590f175af6}} 
+\index{utility.\+h@{utility.\+h}!P\+A\+C\+K\+A\+G\+E\+\_\+\+N\+A\+ME@{P\+A\+C\+K\+A\+G\+E\+\_\+\+N\+A\+ME}}
+\index{P\+A\+C\+K\+A\+G\+E\+\_\+\+N\+A\+ME@{P\+A\+C\+K\+A\+G\+E\+\_\+\+N\+A\+ME}!utility.\+h@{utility.\+h}}
+\subsubsection{\texorpdfstring{P\+A\+C\+K\+A\+G\+E\+\_\+\+N\+A\+ME}{PACKAGE\_NAME}}
+{\footnotesize\ttfamily const std\+::string P\+A\+C\+K\+A\+G\+E\+\_\+\+N\+A\+ME = \char`\"{}local\+\_\+localization\char`\"{}}
+
+\mbox{\Hypertarget{utility_8h_a8d6dc4f900862e6a7495a91e1346914d}\label{utility_8h_a8d6dc4f900862e6a7495a91e1346914d}} 
+\index{utility.\+h@{utility.\+h}!V\+E\+C\+T\+O\+R\+\_\+\+F\+I\+E\+L\+D\+\_\+\+D\+I\+S\+T\+A\+N\+CE@{V\+E\+C\+T\+O\+R\+\_\+\+F\+I\+E\+L\+D\+\_\+\+D\+I\+S\+T\+A\+N\+CE}}
+\index{V\+E\+C\+T\+O\+R\+\_\+\+F\+I\+E\+L\+D\+\_\+\+D\+I\+S\+T\+A\+N\+CE@{V\+E\+C\+T\+O\+R\+\_\+\+F\+I\+E\+L\+D\+\_\+\+D\+I\+S\+T\+A\+N\+CE}!utility.\+h@{utility.\+h}}
+\subsubsection{\texorpdfstring{V\+E\+C\+T\+O\+R\+\_\+\+F\+I\+E\+L\+D\+\_\+\+D\+I\+S\+T\+A\+N\+CE}{VECTOR\_FIELD\_DISTANCE}}
+{\footnotesize\ttfamily const int V\+E\+C\+T\+O\+R\+\_\+\+F\+I\+E\+L\+D\+\_\+\+D\+I\+S\+T\+A\+N\+CE = 5}
+
+
+
+grid size of the vector field compared to its original image 
+

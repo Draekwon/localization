@@ -1,0 +1,133 @@
+\hypertarget{classCForceMapGenerator}{}\section{C\+Force\+Map\+Generator Class Reference}
+\label{classCForceMapGenerator}\index{C\+Force\+Map\+Generator@{C\+Force\+Map\+Generator}}
+\subsection*{Public Member Functions}
+\begin{DoxyCompactItemize}
+\item 
+\hyperlink{classCForceMapGenerator_a9ac30f44691e71c6ce65f4eabbb03801}{C\+Force\+Map\+Generator} (cv\+::\+Mat o\+Img)
+\item 
+void \hyperlink{classCForceMapGenerator_a8c3c6ab352e4ddb604dd33befc9b9147}{Create\+Vector\+Fields} ()
+\item 
+cv\+::\+Mat2d \hyperlink{classCForceMapGenerator_afdd89858af3158b17170960df126a7df}{Get\+Distance\+Map} ()
+\item 
+cv\+::\+Mat2d \hyperlink{classCForceMapGenerator_aee9ad3b402d9275ea734876a8922d616}{Get\+Force\+Map} ()
+\item 
+void \hyperlink{classCForceMapGenerator_ad6fc008755aff2eb7ce583cef1e46d6d}{Save\+Distance\+Map\+To\+File} (std\+::string s\+Filename)
+\item 
+void \hyperlink{classCForceMapGenerator_a23f80d23617ecfe5eb3e306293046b53}{Save\+Force\+Map\+To\+File} (std\+::string s\+Filename)
+\item 
+void \hyperlink{classCForceMapGenerator_a80a8ceee6174a3f0420d70bab79f0129}{Draw\+Distance\+Map} ()
+\item 
+void \hyperlink{classCForceMapGenerator_a9880307758a447f1e9eded5ccb7d339d}{Draw\+Force\+Map} ()
+\end{DoxyCompactItemize}
+\subsection*{Static Public Member Functions}
+\begin{DoxyCompactItemize}
+\item 
+static void \hyperlink{classCForceMapGenerator_a09b76abc4d57bd7f10ecd9b4895e3575}{Draw\+Distance\+Map} (std\+::string s\+Map\+Path)
+\item 
+static void \hyperlink{classCForceMapGenerator_ab05430eb97cf83da00b1116877a37c36}{Draw\+Force\+Map} (std\+::string s\+Map\+Path)
+\end{DoxyCompactItemize}
+
+
+\subsection{Detailed Description}
+this class generates a distance-\/ and a force vector field as described in the following paper\+: \href{http://page.mi.fu-berlin.de/rojas/2003/matrix.pdf}{\tt http\+://page.\+mi.\+fu-\/berlin.\+de/rojas/2003/matrix.\+pdf} (p.\+4-\/5) 
+
+\subsection{Constructor \& Destructor Documentation}
+\mbox{\Hypertarget{classCForceMapGenerator_a9ac30f44691e71c6ce65f4eabbb03801}\label{classCForceMapGenerator_a9ac30f44691e71c6ce65f4eabbb03801}} 
+\index{C\+Force\+Map\+Generator@{C\+Force\+Map\+Generator}!C\+Force\+Map\+Generator@{C\+Force\+Map\+Generator}}
+\index{C\+Force\+Map\+Generator@{C\+Force\+Map\+Generator}!C\+Force\+Map\+Generator@{C\+Force\+Map\+Generator}}
+\subsubsection{\texorpdfstring{C\+Force\+Map\+Generator()}{CForceMapGenerator()}}
+{\footnotesize\ttfamily C\+Force\+Map\+Generator\+::\+C\+Force\+Map\+Generator (\begin{DoxyParamCaption}\item[{cv\+::\+Mat}]{o\+Img }\end{DoxyParamCaption})\hspace{0.3cm}{\ttfamily [inline]}}
+
+constructor 
+\begin{DoxyParams}{Parameters}
+{\em o\+Img} & the image to be turned into a vector field \\
+\hline
+\end{DoxyParams}
+
+
+\subsection{Member Function Documentation}
+\mbox{\Hypertarget{classCForceMapGenerator_a8c3c6ab352e4ddb604dd33befc9b9147}\label{classCForceMapGenerator_a8c3c6ab352e4ddb604dd33befc9b9147}} 
+\index{C\+Force\+Map\+Generator@{C\+Force\+Map\+Generator}!Create\+Vector\+Fields@{Create\+Vector\+Fields}}
+\index{Create\+Vector\+Fields@{Create\+Vector\+Fields}!C\+Force\+Map\+Generator@{C\+Force\+Map\+Generator}}
+\subsubsection{\texorpdfstring{Create\+Vector\+Fields()}{CreateVectorFields()}}
+{\footnotesize\ttfamily void C\+Force\+Map\+Generator\+::\+Create\+Vector\+Fields (\begin{DoxyParamCaption}{ }\end{DoxyParamCaption})\hspace{0.3cm}{\ttfamily [inline]}}
+
+this method iterates through the given image multiple times to build a distance-\/ and a force-\/potential field a scale factor of 1px = 1cm is assumed !this takes a long time! \mbox{\Hypertarget{classCForceMapGenerator_a80a8ceee6174a3f0420d70bab79f0129}\label{classCForceMapGenerator_a80a8ceee6174a3f0420d70bab79f0129}} 
+\index{C\+Force\+Map\+Generator@{C\+Force\+Map\+Generator}!Draw\+Distance\+Map@{Draw\+Distance\+Map}}
+\index{Draw\+Distance\+Map@{Draw\+Distance\+Map}!C\+Force\+Map\+Generator@{C\+Force\+Map\+Generator}}
+\subsubsection{\texorpdfstring{Draw\+Distance\+Map()}{DrawDistanceMap()}\hspace{0.1cm}{\footnotesize\ttfamily [1/2]}}
+{\footnotesize\ttfamily void C\+Force\+Map\+Generator\+::\+Draw\+Distance\+Map (\begin{DoxyParamCaption}{ }\end{DoxyParamCaption})\hspace{0.3cm}{\ttfamily [inline]}}
+
+displays the generated distance vector field as an opencv image \mbox{\Hypertarget{classCForceMapGenerator_a09b76abc4d57bd7f10ecd9b4895e3575}\label{classCForceMapGenerator_a09b76abc4d57bd7f10ecd9b4895e3575}} 
+\index{C\+Force\+Map\+Generator@{C\+Force\+Map\+Generator}!Draw\+Distance\+Map@{Draw\+Distance\+Map}}
+\index{Draw\+Distance\+Map@{Draw\+Distance\+Map}!C\+Force\+Map\+Generator@{C\+Force\+Map\+Generator}}
+\subsubsection{\texorpdfstring{Draw\+Distance\+Map()}{DrawDistanceMap()}\hspace{0.1cm}{\footnotesize\ttfamily [2/2]}}
+{\footnotesize\ttfamily static void C\+Force\+Map\+Generator\+::\+Draw\+Distance\+Map (\begin{DoxyParamCaption}\item[{std\+::string}]{s\+Map\+Path }\end{DoxyParamCaption})\hspace{0.3cm}{\ttfamily [inline]}, {\ttfamily [static]}}
+
+loads a distance vector field from a file and displays it as an opencv image 
+\begin{DoxyParams}{Parameters}
+{\em s\+Map\+Path} & path to the file the distance vector field is saved in \\
+\hline
+\end{DoxyParams}
+\mbox{\Hypertarget{classCForceMapGenerator_a9880307758a447f1e9eded5ccb7d339d}\label{classCForceMapGenerator_a9880307758a447f1e9eded5ccb7d339d}} 
+\index{C\+Force\+Map\+Generator@{C\+Force\+Map\+Generator}!Draw\+Force\+Map@{Draw\+Force\+Map}}
+\index{Draw\+Force\+Map@{Draw\+Force\+Map}!C\+Force\+Map\+Generator@{C\+Force\+Map\+Generator}}
+\subsubsection{\texorpdfstring{Draw\+Force\+Map()}{DrawForceMap()}\hspace{0.1cm}{\footnotesize\ttfamily [1/2]}}
+{\footnotesize\ttfamily void C\+Force\+Map\+Generator\+::\+Draw\+Force\+Map (\begin{DoxyParamCaption}{ }\end{DoxyParamCaption})\hspace{0.3cm}{\ttfamily [inline]}}
+
+displays the generated force vector field as an opencv image \mbox{\Hypertarget{classCForceMapGenerator_ab05430eb97cf83da00b1116877a37c36}\label{classCForceMapGenerator_ab05430eb97cf83da00b1116877a37c36}} 
+\index{C\+Force\+Map\+Generator@{C\+Force\+Map\+Generator}!Draw\+Force\+Map@{Draw\+Force\+Map}}
+\index{Draw\+Force\+Map@{Draw\+Force\+Map}!C\+Force\+Map\+Generator@{C\+Force\+Map\+Generator}}
+\subsubsection{\texorpdfstring{Draw\+Force\+Map()}{DrawForceMap()}\hspace{0.1cm}{\footnotesize\ttfamily [2/2]}}
+{\footnotesize\ttfamily static void C\+Force\+Map\+Generator\+::\+Draw\+Force\+Map (\begin{DoxyParamCaption}\item[{std\+::string}]{s\+Map\+Path }\end{DoxyParamCaption})\hspace{0.3cm}{\ttfamily [inline]}, {\ttfamily [static]}}
+
+loads a force vector field from a file and displays it as an opencv image 
+\begin{DoxyParams}{Parameters}
+{\em s\+Map\+Path} & path to the file the force vector field is saved in \\
+\hline
+\end{DoxyParams}
+\mbox{\Hypertarget{classCForceMapGenerator_afdd89858af3158b17170960df126a7df}\label{classCForceMapGenerator_afdd89858af3158b17170960df126a7df}} 
+\index{C\+Force\+Map\+Generator@{C\+Force\+Map\+Generator}!Get\+Distance\+Map@{Get\+Distance\+Map}}
+\index{Get\+Distance\+Map@{Get\+Distance\+Map}!C\+Force\+Map\+Generator@{C\+Force\+Map\+Generator}}
+\subsubsection{\texorpdfstring{Get\+Distance\+Map()}{GetDistanceMap()}}
+{\footnotesize\ttfamily cv\+::\+Mat2d C\+Force\+Map\+Generator\+::\+Get\+Distance\+Map (\begin{DoxyParamCaption}{ }\end{DoxyParamCaption})\hspace{0.3cm}{\ttfamily [inline]}}
+
+returns the generated distance vector field \begin{DoxyReturn}{Returns}
+the generated distance vector field 
+\end{DoxyReturn}
+\mbox{\Hypertarget{classCForceMapGenerator_aee9ad3b402d9275ea734876a8922d616}\label{classCForceMapGenerator_aee9ad3b402d9275ea734876a8922d616}} 
+\index{C\+Force\+Map\+Generator@{C\+Force\+Map\+Generator}!Get\+Force\+Map@{Get\+Force\+Map}}
+\index{Get\+Force\+Map@{Get\+Force\+Map}!C\+Force\+Map\+Generator@{C\+Force\+Map\+Generator}}
+\subsubsection{\texorpdfstring{Get\+Force\+Map()}{GetForceMap()}}
+{\footnotesize\ttfamily cv\+::\+Mat2d C\+Force\+Map\+Generator\+::\+Get\+Force\+Map (\begin{DoxyParamCaption}{ }\end{DoxyParamCaption})\hspace{0.3cm}{\ttfamily [inline]}}
+
+returns the generated force vector field \begin{DoxyReturn}{Returns}
+the generated force vector field 
+\end{DoxyReturn}
+\mbox{\Hypertarget{classCForceMapGenerator_ad6fc008755aff2eb7ce583cef1e46d6d}\label{classCForceMapGenerator_ad6fc008755aff2eb7ce583cef1e46d6d}} 
+\index{C\+Force\+Map\+Generator@{C\+Force\+Map\+Generator}!Save\+Distance\+Map\+To\+File@{Save\+Distance\+Map\+To\+File}}
+\index{Save\+Distance\+Map\+To\+File@{Save\+Distance\+Map\+To\+File}!C\+Force\+Map\+Generator@{C\+Force\+Map\+Generator}}
+\subsubsection{\texorpdfstring{Save\+Distance\+Map\+To\+File()}{SaveDistanceMapToFile()}}
+{\footnotesize\ttfamily void C\+Force\+Map\+Generator\+::\+Save\+Distance\+Map\+To\+File (\begin{DoxyParamCaption}\item[{std\+::string}]{s\+Filename }\end{DoxyParamCaption})\hspace{0.3cm}{\ttfamily [inline]}}
+
+saves the generated distance vector field to a file 
+\begin{DoxyParams}{Parameters}
+{\em s\+Filename} & filepath and -\/name the distance vector field should be saved to \\
+\hline
+\end{DoxyParams}
+\mbox{\Hypertarget{classCForceMapGenerator_a23f80d23617ecfe5eb3e306293046b53}\label{classCForceMapGenerator_a23f80d23617ecfe5eb3e306293046b53}} 
+\index{C\+Force\+Map\+Generator@{C\+Force\+Map\+Generator}!Save\+Force\+Map\+To\+File@{Save\+Force\+Map\+To\+File}}
+\index{Save\+Force\+Map\+To\+File@{Save\+Force\+Map\+To\+File}!C\+Force\+Map\+Generator@{C\+Force\+Map\+Generator}}
+\subsubsection{\texorpdfstring{Save\+Force\+Map\+To\+File()}{SaveForceMapToFile()}}
+{\footnotesize\ttfamily void C\+Force\+Map\+Generator\+::\+Save\+Force\+Map\+To\+File (\begin{DoxyParamCaption}\item[{std\+::string}]{s\+Filename }\end{DoxyParamCaption})\hspace{0.3cm}{\ttfamily [inline]}}
+
+saves the generated force vector field to a file 
+\begin{DoxyParams}{Parameters}
+{\em s\+Filename} & filepath and -\/name the force vector field should be saved to \\
+\hline
+\end{DoxyParams}
+
+
+The documentation for this class was generated from the following file\+:\begin{DoxyCompactItemize}
+\item 
+/home/sh/localization/catkin\+\_\+ws\+\_\+user/src/local\+\_\+localization/src/forcemap\+\_\+generator.\+cpp\end{DoxyCompactItemize}
