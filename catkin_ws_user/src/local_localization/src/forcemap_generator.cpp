@@ -411,7 +411,7 @@ void CreateMaps()
 
 int main(int argc, char **argv)
 {
-	CreateMaps();
+	//CreateMaps();
 
 	std::string sMapPath = ros::package::getPath(PACKAGE_NAME) + "/mapTables/";
 	CForceMapGenerator::DrawDistanceMap(sMapPath + "distancemap.xml");
