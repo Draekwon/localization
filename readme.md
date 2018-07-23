@@ -2,7 +2,7 @@
 
 This project implements the [MATRIX-Localization](http://page.mi.fu-berlin.de/rojas/2003/matrix.pdf) for autonomous model cars.
 
-[>>> wiki][098be986]
+[>>> wiki](https://github.com/Draekwon/localization/wiki)
 
 ## Short Instructions using the simulator
 
@@ -17,6 +17,3 @@ This project implements the [MATRIX-Localization](http://page.mi.fu-berlin.de/ro
 3. start the MATRIX localization
    - ``` source [localization/catkin_ws_user/]devel/setup.bash ```
    - ``` rosrun local_localization local_localization_cameraOverlay ```
-
-
-  [098be986]: https://github.com/Draekwon/localization/wiki "https://github.com/Draekwon/localization/wiki"
