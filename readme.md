@@ -19,4 +19,4 @@ This project implements the [MATRIX-Localization](http://page.mi.fu-berlin.de/ro
    - ``` rosrun local_localization local_localization_cameraOverlay ```
 
 
-  [098be986]: https://github.com/Draekwon/localization/wiki ">>> wiki"
+  [098be986]: https://github.com/Draekwon/localization/wiki "https://github.com/Draekwon/localization/wiki"
