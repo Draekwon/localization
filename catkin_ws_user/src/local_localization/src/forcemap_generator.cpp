@@ -285,8 +285,11 @@ public:
 			{
 				int nDrawMatRow = 50 + nDMapRow * 100;
 
-				cv::Point2d oDistVector = m_oDistanceMap.at<cv::Point2d>(nDMapRow, nDMapCol);
-				oDistVector = oDistVector * 1000; // / (GetVectorLength(oDistVector) == 0 ? 1 : GetVectorLength(oDistVector)) * 75;
+				cv::Point2d oDistVector = m_oDistanceMap.at<cv::Point2d>(nDMapRow, nDMapCol) * 1000;
+				if (GetVectorLength(oDistVector) < 50)
+					oDistVector = oDistVector / (GetVectorLength(oDistVector) == 0 ? 1 : GetVectorLength(oDistVector)) * 50;
+				else if (GetVectorLength(oDistVector) > 150)
+					oDistVector = oDistVector / (GetVectorLength(oDistVector) == 0 ? 1 : GetVectorLength(oDistVector)) * 150;
 				cv::Scalar color = cv::Scalar(0,0,255);
 				cv::Point oCoordinate(nDrawMatCol, nDrawMatRow);
 				arrowedLine(oDrawMat, oCoordinate, oCoordinate + cv::Point(oDistVector), color, 5, cv::LINE_AA);
@@ -310,8 +313,11 @@ public:
 			{
 				int nDMatRow = 50 + nFMapRow * 100;
 
-				cv::Point2d oForceVector = m_oForceMap.at<cv::Point2d>(nFMapRow, nFMapCol);
-				oForceVector = oForceVector * 1000; // / (GetVectorLength(oForceVector) == 0 ? 1 : GetVectorLength(oForceVector)) * 75;
+				cv::Point2d oForceVector = m_oForceMap.at<cv::Point2d>(nFMapRow, nFMapCol) * 1000;
+				if (GetVectorLength(oForceVector) < 50)
+					oForceVector = oForceVector / (GetVectorLength(oForceVector) == 0 ? 1 : GetVectorLength(oForceVector)) * 50;
+				else if (GetVectorLength(oForceVector) > 150)
+					oForceVector = oForceVector / (GetVectorLength(oForceVector) == 0 ? 1 : GetVectorLength(oForceVector)) * 150;
 				cv::Scalar color = cv::Scalar(0,0,255);
 				cv::Point oCoordinate(nDMatCol, nDMatRow);
 				arrowedLine(oDrawMat, oCoordinate, oCoordinate + cv::Point(oForceVector), color, 5, cv::LINE_AA);
@@ -342,8 +348,11 @@ public:
 			{
 				int nDrawMatRow = 50 + nDMapRow * 100;
 
-				cv::Point2d oDistVector = oDistanceMap.at<cv::Point2d>(nDMapRow, nDMapCol);
-				oDistVector = oDistVector * 1000; // / (GetVectorLength(oDistVector) == 0 ? 1 : GetVectorLength(oDistVector)) * 75;
+				cv::Point2d oDistVector = oDistanceMap.at<cv::Point2d>(nDMapRow, nDMapCol) * 1000;
+				if (GetVectorLength(oDistVector) < 50)
+					oDistVector = oDistVector / (GetVectorLength(oDistVector) == 0 ? 1 : GetVectorLength(oDistVector)) * 50;
+				else if (GetVectorLength(oDistVector) > 150)
+					oDistVector = oDistVector / (GetVectorLength(oDistVector) == 0 ? 1 : GetVectorLength(oDistVector)) * 150;
 				cv::Scalar color = cv::Scalar(0,0,255);
 				cv::Point oCoordinate(nDrawMatCol, nDrawMatRow);
 				arrowedLine(oDrawMat, oCoordinate, oCoordinate + cv::Point(oDistVector), color, 5, cv::LINE_AA);
@@ -374,8 +383,11 @@ public:
 			{
 				int nDMatRow = 50 + nFMapRow * 100;
 
-				cv::Point2d oForceVector = oForceMap.at<cv::Point2d>(nFMapRow, nFMapCol);
-				oForceVector = oForceVector * 1000; // / (GetVectorLength(oForceVector) == 0 ? 1 : GetVectorLength(oForceVector)) * 75;
+				cv::Point2d oForceVector = oForceMap.at<cv::Point2d>(nFMapRow, nFMapCol) * 1000;
+				if (GetVectorLength(oForceVector) < 50)
+					oForceVector = oForceVector / (GetVectorLength(oForceVector) == 0 ? 1 : GetVectorLength(oForceVector)) * 50;
+				else if (GetVectorLength(oForceVector) > 150)
+					oForceVector = oForceVector / (GetVectorLength(oForceVector) == 0 ? 1 : GetVectorLength(oForceVector)) * 150;
 				cv::Scalar color = cv::Scalar(0,0,255);
 				cv::Point oCoordinate(nDMatCol, nDMatRow);
 				arrowedLine(oDrawMat, oCoordinate, oCoordinate + cv::Point(oForceVector), color, 5, cv::LINE_AA);

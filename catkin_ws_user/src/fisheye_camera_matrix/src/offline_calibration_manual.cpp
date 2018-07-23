@@ -82,7 +82,7 @@ int main(int argc, char **argv) {
   cy     = height / 2;
 
   img.copyTo(img_ud);
-  cv::namedWindow("undistorted", CV_WINDOW_AUTOSIZE);
+  cv::namedWindow("undistorted", CV_WINDOW_NORMAL);
   cv::createTrackbar("focal length", "undistorted", &fl, fl_max, apply);
   cv::createTrackbar("distance lens<->ceiling (cm)", "undistorted", &ceil_height, ceil_height_max, apply);
   cv::createTrackbar("scale", "undistorted", &scale, scale_max, apply);
