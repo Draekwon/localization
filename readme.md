@@ -2,7 +2,7 @@
 
 This project implements the [MATRIX-Localization](http://page.mi.fu-berlin.de/rojas/2003/matrix.pdf) for autonomous model cars.
 
-**  [>>> wiki][098be986] **
+[>>> wiki][098be986]
 
 ## Short Instructions using the simulator
 
