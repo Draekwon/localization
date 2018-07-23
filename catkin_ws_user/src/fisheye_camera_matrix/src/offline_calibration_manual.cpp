@@ -3,18 +3,27 @@
 #include <fstream>
 #include <ros/ros.h>
 #include <ros/package.h>
+#include <opencv2/core.hpp>
+#include <opencv2/calib3d.hpp>
 #include <opencv2/highgui/highgui.hpp>
 #include <opencv2/imgproc/imgproc.hpp>
 #include "fisheye_camera_matrix/camera_matrix.hpp"
 
-fisheye_camera_matrix::CameraMatrix camera_matrix;
 cv::Mat img;
 cv::Mat img_ud;
 
+// intrinsic
 int width;
 int height;
 int cx;
 int cy;
+
+// extrinsic
+int wz;
+int nZRotation;
+int nYRotation;
+int nXRotation = 180;
+
 
 int fl              = 320;
 int fl_max          = 960;
@@ -23,35 +32,58 @@ int ceil_height_max = 350;
 int scale           = 10;
 int scale_max       = 30;
 
-void apply(int, void*) {
-  camera_matrix = fisheye_camera_matrix::CameraMatrix(
-      width, height, cx, cy, fl, ceil_height / 100.0, scale / 10.0);
+int wzMax 			= 200;
 
-  camera_matrix.undistort(img, img_ud);
+cv::Mat camMat;
+cv::Mat distCoeffs;
+std::vector<cv::Mat> rvecs;
+std::vector<cv::Mat> tvecs;
 
-  cv::Point2f t1(-1,  0);
-  cv::Point2f t2( 1,  0);
-  cv::Point2f t3( 0, -1);
-  cv::Point2f t4( 0,  1);
-  cv::Point2f t5(-1, -1);
-  cv::Point2f t6( 1,  1);
+std::vector<std::vector<cv::Point3f>> objectPoints = {
+		{
+		  cv::Point3f(915, 580, 0),
+		  cv::Point3f(950, 560, 0),
+		  cv::Point3f(920, 610, 0),
+		  cv::Point3f(990, 600, 0),
+		  cv::Point3f(910, 650, 0),
+		  cv::Point3f(1015, 645, 0)
+		}
+};
 
-  cv::Point2i t5_img = camera_matrix.relative2image(t5);
-  cv::Point2i t6_img = camera_matrix.relative2image(t6);
+std::vector<std::vector<cv::Point2f>> imagePoints = {
+		{
+		  cv::Point2f(235, 295),
+		  cv::Point2f(265, 360),
+		  cv::Point2f(215,310),
+		  cv::Point2f(255, 370),
+		  cv::Point2f(200, 315),
+		  cv::Point2f(220, 385)
+		}
+};
 
-  printf("\n================ test: project forth and back ================\n");
-  printf("ceil: (%.2f, %.2f) -> img: (%d, %d) -> ceil: (%.2f, %.2f)\n",
-      t5.x, t5.y, t5_img.x, t5_img.y,
-      camera_matrix.image2relative(t5_img).x, camera_matrix.image2relative(t5_img).y);
-  printf("ceil: (%.2f, %.2f) -> img: (%d, %d) -> ceil: (%.2f, %.2f)\n",
-      t6.x, t6.y, t6_img.x, t6_img.y,
-      camera_matrix.image2relative(t6_img).x, camera_matrix.image2relative(t6_img).y);
+
+void apply(int, void*)
+{
+  // convert degrees -> radians
+  double dZRotation = nZRotation / 180.0 * M_PI;
+  double dYRotation = dYRotation / 180.0 * M_PI;
+  double dXRotation = dXRotation / 180.0 * M_PI;
+
+  camMat = cv::Mat1d::eye(3, 3);
+  camMat.at<double>(0, 0) = fl;
+  camMat.at<double>(1, 1) = fl;
+  camMat.at<double>(0, 2) = cx;
+  camMat.at<double>(1, 2) = cy;
+
+  cv::Size imageSize(img.cols, img.rows);
+
+  cv::calibrateCamera(objectPoints, imagePoints, imageSize, camMat, distCoeffs, rvecs, tvecs, CV_CALIB_CB_NORMALIZE_IMAGE);
+
+  cv::undistort(img, img_ud, camMat, distCoeffs);
 
   std::cout << width << " " << height << " " << cx << " " << cy << " "
 	      << fl << " " << (ceil_height / 100.0) << " " << (scale / 10.0) << std::endl;
 
-  cv::line(img_ud, camera_matrix.relative2image(t1), camera_matrix.relative2image(t2), cv::Scalar(0, 0, 255), 2);
-  cv::line(img_ud, camera_matrix.relative2image(t3), camera_matrix.relative2image(t4), cv::Scalar(0, 0, 255), 2);
   cv::imshow("undistorted", img_ud);
 }
 
@@ -81,11 +113,13 @@ int main(int argc, char **argv) {
   cx     = width / 2;
   cy     = height / 2;
 
+
   img.copyTo(img_ud);
   cv::namedWindow("undistorted", CV_WINDOW_NORMAL);
   cv::createTrackbar("focal length", "undistorted", &fl, fl_max, apply);
-  cv::createTrackbar("distance lens<->ceiling (cm)", "undistorted", &ceil_height, ceil_height_max, apply);
-  cv::createTrackbar("scale", "undistorted", &scale, scale_max, apply);
+  cv::createTrackbar("z distance", "undistorted", &wz, wzMax, apply);
+
+
   apply(0, (void*)0);
   cv::waitKey(0);
 
