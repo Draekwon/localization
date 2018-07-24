@@ -4,7 +4,7 @@
 #include <ros/ros.h>
 #include <ros/package.h>
 #include <opencv2/core.hpp>
-#include <opencv2/calib3d.hpp>
+#include <opencv2/ccalib/omnidir.hpp>
 #include <opencv2/highgui/highgui.hpp>
 #include <opencv2/imgproc/imgproc.hpp>
 #include "fisheye_camera_matrix/camera_matrix.hpp"
@@ -39,27 +39,9 @@ cv::Mat distCoeffs;
 std::vector<cv::Mat> rvecs;
 std::vector<cv::Mat> tvecs;
 
-std::vector<std::vector<cv::Point3f>> objectPoints = {
-		{
-		  cv::Point3f(915, 580, 0),
-		  cv::Point3f(950, 560, 0),
-		  cv::Point3f(920, 610, 0),
-		  cv::Point3f(990, 600, 0),
-		  cv::Point3f(910, 650, 0),
-		  cv::Point3f(1015, 645, 0)
-		}
-};
+std::vector<cv::Mat> objectPoints;
 
-std::vector<std::vector<cv::Point2f>> imagePoints = {
-		{
-		  cv::Point2f(235, 295),
-		  cv::Point2f(265, 360),
-		  cv::Point2f(215,310),
-		  cv::Point2f(255, 370),
-		  cv::Point2f(200, 315),
-		  cv::Point2f(220, 385)
-		}
-};
+std::vector<cv::Mat> imagePoints;
 
 
 void apply(int, void*)
@@ -77,9 +59,18 @@ void apply(int, void*)
 
   cv::Size imageSize(img.cols, img.rows);
 
-  cv::calibrateCamera(objectPoints, imagePoints, imageSize, camMat, distCoeffs, rvecs, tvecs, CV_CALIB_CB_NORMALIZE_IMAGE);
-
-  cv::undistort(img, img_ud, camMat, distCoeffs);
+  cv::Mat K, xi, D, idx;
+  int flags = 0;
+  cv::TermCriteria critia(cv::TermCriteria::COUNT + cv::TermCriteria::EPS, 200, 0.0001);
+  std::vector<cv::Mat> rvecs, tvecs;
+  std::cout << "((cv::InputArrayOfArrays)objectPoints).type() " << ((cv::InputArrayOfArrays)objectPoints).type() << std::endl;
+  std::cout << "(((6) & ((1 << 3) - 1)) + (((3)-1) << 3))): " << ((((6) & ((1 << 3) - 1)) + (((3)-1) << 3))) << std::endl;
+  std::cout << "before calib " << (!((cv::InputArrayOfArrays)objectPoints).empty() && (((cv::InputArrayOfArrays)objectPoints).type() == CV_64FC3)) << std::endl;
+  CV_Assert(!((cv::InputArrayOfArrays)objectPoints).empty() && (((cv::InputArrayOfArrays)objectPoints).type() == CV_64FC3));
+  std::cout << " after assert " << std::endl;
+  double rms = cv::omnidir::calibrate(objectPoints, imagePoints, imageSize, K, xi, D, rvecs, tvecs, flags, critia, idx);
+  std::cout << "after calib" << std::endl;
+  cv::omnidir::undistortImage(img, img_ud, K, D, xi, cv::omnidir::RECTIFY_PERSPECTIVE);
 
   std::cout << width << " " << height << " " << cx << " " << cy << " "
 	      << fl << " " << (ceil_height / 100.0) << " " << (scale / 10.0) << std::endl;
@@ -90,12 +81,15 @@ void apply(int, void*)
 int main(int argc, char **argv) {
   ros::init(argc, argv, "calibration");
 
+  std::cout << argc << std::endl;
+  std::cout << argv[0] << " " << argv [argc-1] << std::endl;
+
   if(argc < 3) {
     ROS_ERROR("Please use roslaunch: 'roslaunch fisheye_camera_matrix calibrate_offline_manual.launch "
               "[img:=FILE] [calib:=FILE]'");
     return 1;
   }
-
+  std::cout << ros::package::getPath("fisheye_camera_matrix") << std::endl;
   std::string path_img   = ros::package::getPath("fisheye_camera_matrix") + std::string("/../../../captures/") + std::string(argv[1]);
   std::string path_calib = ros::package::getPath("fisheye_camera_matrix") + std::string("/config/") + std::string(argv[2]);
 
@@ -119,6 +113,23 @@ int main(int argc, char **argv) {
   cv::createTrackbar("focal length", "undistorted", &fl, fl_max, apply);
   cv::createTrackbar("z distance", "undistorted", &wz, wzMax, apply);
 
+  cv::Mat* objMat = new cv::Mat(6,1,CV_64FC3);
+  objMat->at<cv::Point3f>(0,0) = cv::Point3f(915, 580, 0);
+  objMat->at<cv::Point3f>(1,0) = cv::Point3f(950, 560, 0);
+  objMat->at<cv::Point3f>(2,0) = cv::Point3f(920, 610, 0);
+  objMat->at<cv::Point3f>(3,0) = cv::Point3f(990, 600, 0);
+  objMat->at<cv::Point3f>(4,0) = cv::Point3f(910, 650, 0);
+  objMat->at<cv::Point3f>(5,0) = cv::Point3f(1015, 645, 0);
+  objectPoints.push_back(*objMat);
+
+  cv::Mat* imgMat = new cv::Mat(6,1,CV_64FC2);
+  imgMat->at<cv::Point2f>(0,0) = cv::Point2f(235, 295);
+  imgMat->at<cv::Point2f>(1,0) = cv::Point2f(265, 360);
+  imgMat->at<cv::Point2f>(2,0) = cv::Point2f(215, 310);
+  imgMat->at<cv::Point2f>(3,0) = cv::Point2f(255, 370);
+  imgMat->at<cv::Point2f>(4,0) = cv::Point2f(200, 315);
+  imgMat->at<cv::Point2f>(5,0) = cv::Point2f(220, 385);
+  imagePoints.push_back(*imgMat);
 
   apply(0, (void*)0);
   cv::waitKey(0);
