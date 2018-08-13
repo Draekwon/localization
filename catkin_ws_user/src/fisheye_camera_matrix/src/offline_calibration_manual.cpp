@@ -4,7 +4,9 @@
 #include "opencv2/calib3d.hpp"
 #include "opencv2/highgui.hpp"
 #include <vector>
+#include <fstream>
 #include <iostream>
+#include <sstream>
 #include <string>
 #include <time.h>
 
@@ -26,6 +28,27 @@ static void calcChessboardCorners(const Size &boardSize, const Size2d &squareSiz
         }
     }
 }
+
+static void calcAsyncCircleCorners(const Size &boardSize, const Size2d &circleDistance, Mat& corners)
+{
+    // corners has type of CV_64FC3
+    corners.release();
+    int n = boardSize.width * boardSize.height;
+    corners.create(n, 1, CV_64FC3);
+    Vec3d *ptr = corners.ptr<Vec3d>();
+    for (int i = 0; i < boardSize.height; ++i)
+    {
+        for (int j = 0; j < boardSize.width; ++j)
+        {
+
+        	double width = j * circleDistance.width / 2.0;
+        	double height = i * circleDistance.height / 2.0;
+
+            ptr[i*boardSize.width + j] = Vec3d(width, height, 0.0);
+        }
+    }
+}
+
 
 static bool detecChessboardCorners(const vector<string>& list, vector<string>& list_detected,
     vector<Mat>& imagePoints, Size boardSize, Size& imageSize)
@@ -57,6 +80,36 @@ static bool detecChessboardCorners(const vector<string>& list, vector<string>& l
         return true;
 }
 
+static bool detecAsincCircleCorners(const vector<string>& list, vector<string>& list_detected,
+    vector<Mat>& imagePoints, Size boardSize, Size& imageSize)
+{
+    imagePoints.resize(0);
+    list_detected.resize(0);
+    int n_img = (int)list.size();
+    Mat img;
+    for(int i = 0; i < n_img; ++i)
+    {
+        cout << list[i] << "... ";
+        Mat points;
+        img = imread(list[i], IMREAD_GRAYSCALE);
+        bool found = findChessboardCorners( img, boardSize, points, CALIB_CB_ASYMMETRIC_GRID);
+        if (found)
+        {
+            if (points.type() != CV_64FC2)
+                points.convertTo(points, CV_64FC2);
+            imagePoints.push_back(points);
+            list_detected.push_back(list[i]);
+        }
+        cout << (found ? "FOUND" : "NO") << endl;
+    }
+    if (!img.empty())
+        imageSize = img.size();
+    if (imagePoints.size() < 3)
+        return false;
+    else
+        return true;
+}
+
 static bool readStringList( const string& filename, vector<string>& l )
 {
     l.resize(0);
@@ -69,6 +122,15 @@ static bool readStringList( const string& filename, vector<string>& l )
     FileNodeIterator it = n.begin(), it_end = n.end();
     for( ; it != it_end; ++it )
         l.push_back((string)*it);
+
+
+    std::ifstream infile(filename);
+    std::string line;
+    while (std::getline(infile, line))
+    {
+    	l.push_back(line)
+    }
+
     return true;
 }
 
