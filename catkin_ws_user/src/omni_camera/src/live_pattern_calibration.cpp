@@ -48,7 +48,7 @@ public:
 		m_oBoardSize 		= oBoardSize;
 
 		cv::namedWindow(m_sWindowName, cv::WINDOW_GUI_EXPANDED);
-		cv::createButton("Calibrate now.", CCalibrateOmniCamera::CalibrateButton, m_pButtonClicked, cv::QT_PUSH_BUTTON | cv::QT_NEW_BUTTONBAR);
+		cv::createButton("Calibrate now.", CCalibrateOmniCamera::CalibrateButton, m_pButtonClicked, cv::QT_PUSH_BUTTON);
 		cv::displayStatusBar(m_sWindowName, "0 valid frames received.");
 
 		m_oImageSub = m_oImgTransport.subscribe(sImageTopic, 1,
@@ -66,12 +66,6 @@ private:
 
 	void ImageCallback(const sensor_msgs::ImageConstPtr& msg)
 	{
-		if (*m_pButtonClicked)
-		{
-			CalibrateAndSave();
-			return;
-		}
-
 		cv_bridge::CvImagePtr pCvImg;
 		try
 		{
@@ -97,6 +91,11 @@ private:
 
         m_oImageSize = oGrayImg.size();
 
+		if (*m_pButtonClicked)
+		{
+			CalibrateAndSave();
+		}
+
         cv::imshow(m_sWindowName, pCvImg->image);
         cv::waitKey(1);
 	}
@@ -118,14 +117,13 @@ private:
 		int flags = 0;
 		cv::Mat K, D, xi, idx;
 		std::vector<cv::Vec3d> rvecs, tvecs;
-		double _xi, rms;
+		double rms;
 		cv::TermCriteria criteria(3, 200, 1e-8);
 		rms = cv::omnidir::calibrate(m_aObjectPoints, m_aImagePoints, m_oImageSize, K, xi, D, rvecs, tvecs, flags, criteria, idx);
 		std::cout << "rms: " << rms << std::endl;
-		_xi = xi.at<double>(0);
 		std::cout << "Saving camera params to " << m_sOutputFilename << std::endl;
-		saveCameraParams(m_sOutputFilename, flags, K, D, _xi,
-			rvecs, tvecs, idx, rms, m_aImagePoints);
+		saveCameraParams(m_sOutputFilename, K, D, xi,
+			rvecs, tvecs, rms);
 
 		std::ostringstream strs;
 		strs << "calibration error: " << rms;
@@ -144,9 +142,9 @@ private:
 		*bButtonClicked = true;
 	}
 
-	static void saveCameraParams( const std::string & filename, int flags, const cv::Mat& cameraMatrix,
-	    const cv::Mat& distCoeffs, const double xi, const std::vector<cv::Vec3d>& rvecs, const std::vector<cv::Vec3d>& tvecs,
-	    const cv::Mat& idx, const double rms, const std::vector<std::vector<cv::Point2f>>& imagePoints)
+	static void saveCameraParams( const std::string & filename, const cv::Mat& cameraMatrix,
+	    const cv::Mat& distCoeffs, const cv::Mat& xi, const std::vector<cv::Vec3d>& rvecs, const std::vector<cv::Vec3d>& tvecs,
+		const double rms)
 	{
 	    cv::FileStorage fs( filename, cv::FileStorage::WRITE );
 
@@ -157,27 +155,7 @@ private:
 	    strftime( buf, sizeof(buf)-1, "%c", t2 );
 
 	    fs << "calibration_time" << buf;
-
-	    if ( !rvecs.empty())
-	        fs << "nFrames" << (int)rvecs.size();
-
-	    if ( flags != 0)
-	    {
-	        sprintf( buf, "flags: %s%s%s%s%s%s%s%s%s",
-	            flags & cv::omnidir::CALIB_USE_GUESS ? "+use_intrinsic_guess" : "",
-	            flags & cv::omnidir::CALIB_FIX_SKEW ? "+fix_skew" : "",
-	            flags & cv::omnidir::CALIB_FIX_K1 ? "+fix_k1" : "",
-	            flags & cv::omnidir::CALIB_FIX_K2 ? "+fix_k2" : "",
-	            flags & cv::omnidir::CALIB_FIX_P1 ? "+fix_p1" : "",
-	            flags & cv::omnidir::CALIB_FIX_P2 ? "+fix_p2" : "",
-	            flags & cv::omnidir::CALIB_FIX_XI ? "+fix_xi" : "",
-	            flags & cv::omnidir::CALIB_FIX_GAMMA ? "+fix_gamma" : "",
-	            flags & cv::omnidir::CALIB_FIX_CENTER ? "+fix_center" : "");
-	        //cvWriteComment( *fs, buf, 0 );
-	    }
-
-	    fs << "flags" << flags;
-
+	    fs << "rms" << rms;
 	    fs << "camera_matrix" << cameraMatrix;
 	    fs << "distortion_coefficients" << distCoeffs;
 	    fs << "xi" << xi;
@@ -192,20 +170,6 @@ private:
 	        }
 	        //cvWriteComment( *fs, "a set of 6-tuples (rotation vector + translation vector) for each view", 0 );
 	        fs << "extrinsic_parameters" << rvec_tvec;
-	    }
-
-	    fs << "rms" << rms;
-
-	    if ( !imagePoints.empty() )
-	    {
-	        cv::Mat imageMat((int)imagePoints.size(), (int)imagePoints[0].size(), CV_64FC2);
-	        for (int i = 0; i < (int)imagePoints.size(); ++i)
-	        {
-	            cv::Mat r = imageMat.row(i).reshape(2, imageMat.cols);
-	            cv::Mat imagei(imagePoints[i]);
-	            imagei.copyTo(r);
-	        }
-	        fs << "image_points" << imageMat;
 	    }
 	}
 
@@ -244,8 +208,8 @@ int main(int argc, char** argv)
     							 "{t|/usb_cam/image_raw|ros image topic}"
                                  "{help||show help}"
                                  );
-    parser.about("This is a sample for omnidirectional camera calibration. Example command line:\n"
-                 "    omni_calibration -w=6 -h=9 -sw=80 -sh=80 \n");//
+    parser.about("This is the omnidirectional camera calibration. Example command line:\n"
+                 "    omni_calibration -w=4 -h=11 -sw=0.06 -sh=0.06 \n");//
     if (parser.has("help"))
     {
         parser.printMessage();
