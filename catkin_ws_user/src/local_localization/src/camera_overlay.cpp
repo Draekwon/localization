@@ -266,8 +266,7 @@ public:
 			}
 		}
 
-		oForceVector /= counter == 0 ? 1
-				: counter;
+		oForceVector /= counter == 0 ? 1 : counter;
 		oTorque /= counter == 0 ? 1 : counter;
 		return oForceVector * CM_TO_M;
 	}
@@ -351,17 +350,15 @@ public:
 					m_oMapImg.cols, m_oMapImg.rows, oCenter, -fDifferentialYaw);
 			cv::Point2d oForceVector = GetForceVector(oTransformationMat, oPreparedCameraImg, oTorque, oCenter);
 
-			if (m_bPublishOverlay)
-				PublishMapOverlay(oPreparedCameraImg, -fDifferentialYaw, cv::Point(oCenter));
 
 			if (oTorque > 0)
 				// + 1 degree
-				fDifferentialYaw += 1.0 / 3 / 180.0 * M_PI;
+				fDifferentialYaw -= 1.0 / 3 / 180.0 * M_PI;
 			else
 				// - 1 degree
-				fDifferentialYaw -= 1.0 / 3 / 180.0 * M_PI;
-//			fDifferentialYaw += oTorque / 10.0 / 180.0 * M_PI;
-			std::cout << "oTorque " << oTorque << std::endl;
+				fDifferentialYaw += 1.0 / 3 / 180.0 * M_PI;
+
+			std::cout << "oTorque " << oTorque << ", fDifferentialYaw " << fDifferentialYaw << std::endl;
 			// force vectors are scaled, so that the longest one is 1cm (0.01m)
 			// scale them
 			oForceVector /= GetVectorLength(oForceVector);
@@ -372,6 +369,9 @@ public:
 			oPosition.y += std::isinf(oForceVector.y) || std::isnan(oForceVector.y) ? 0 : oForceVector.y;
 
 			std::cout << "Position: " << oPosition << ", forcevector: " << oForceVector << std::endl;
+
+			if (m_bPublishOverlay)
+				PublishMapOverlay(oPreparedCameraImg, -fDifferentialYaw, cv::Point(oCenter));
 
 			nav_msgs::Odometry odom;
 			odom.header.stamp = ros::Time::now();
