@@ -404,7 +404,8 @@ public:
 void CreateMaps()
 {
 	std::string sImagePath = ros::package::getPath(PACKAGE_NAME) + "/images/";
-	std::string sImageName("Lab_map_600x400.png");
+//	std::string sImageName("Lab_map_600x400.png");
+	std::string sImageName("fu_robotics_lab_map.jpg");
 	cv::Mat src = imread(sImagePath + sImageName, cv::IMREAD_GRAYSCALE);
 
 	if (src.empty())
@@ -423,7 +424,7 @@ void CreateMaps()
 
 int main(int argc, char **argv)
 {
-	//CreateMaps();
+	CreateMaps();
 
 	std::string sMapPath = ros::package::getPath(PACKAGE_NAME) + "/mapTables/";
 	CForceMapGenerator::DrawDistanceMap(sMapPath + "distancemap.xml");

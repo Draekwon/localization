@@ -35,13 +35,14 @@ private:
 	cv::Size								m_oBoardSize;
 	cv::Size								m_oImageSize;
 
+	bool 	m_bIsChessboard;
 	bool*	m_pButtonClicked;
 
 public:
 
 	CCalibrateOmniCamera(std::string sOutputFilename, std::vector<std::vector<cv::Point3f>>& aObjectPoints, cv::Size& oBoardSize,
-			std::string sImageTopic)
-	: m_oImgTransport(m_oNodeHandle), m_pButtonClicked(new bool(false))
+			std::string sImageTopic, bool bIsChessboard)
+	: m_oImgTransport(m_oNodeHandle), m_pButtonClicked(new bool(false)), m_bIsChessboard(bIsChessboard)
 	{
 		m_sOutputFilename	= sOutputFilename;
 		m_aObjectPoints 	= aObjectPoints;
@@ -51,7 +52,7 @@ public:
 		cv::createButton("Calibrate now.", CCalibrateOmniCamera::CalibrateButton, m_pButtonClicked, cv::QT_PUSH_BUTTON);
 		cv::displayStatusBar(m_sWindowName, "0 valid frames received.");
 
-		m_oImageSub = m_oImgTransport.subscribe(sImageTopic, 1,
+		m_oImageSub = m_oImgTransport.subscribe(sImageTopic, 50,
 				  &CCalibrateOmniCamera::ImageCallback, this, image_transport::TransportHints("compressed"));
 	}
 
@@ -80,7 +81,11 @@ private:
 		cv::cvtColor(pCvImg->image, oGrayImg, cv::COLOR_BGR2GRAY);
 
         std::vector<cv::Point2f> aPoints;
-        bool found = findCirclesGrid(oGrayImg, m_oBoardSize, aPoints, cv::CALIB_CB_ASYMMETRIC_GRID);
+        bool found;
+        if (m_bIsChessboard)
+        	found = findChessboardCorners(oGrayImg, m_oBoardSize, aPoints, cv::CALIB_CB_ADAPTIVE_THRESH);
+        else
+        	found = findCirclesGrid(oGrayImg, m_oBoardSize, aPoints, cv::CALIB_CB_ASYMMETRIC_GRID);
         if (found)
         {
             m_aImagePoints.push_back(aPoints);
@@ -175,6 +180,21 @@ private:
 
 };
 
+static void calcChessBoardCorners(const cv::Size &boardSize, const cv::Size2f &squareSize, std::vector<cv::Point3f>& corners)
+{
+    corners.clear();
+	for (int nHeight = 0; nHeight < boardSize.height; ++nHeight)
+	{
+		for (int nWidth = 0; nWidth < boardSize.width; ++nWidth)
+		{
+        	// every second point is indented by half the width
+        	float dCurrentWidth = nWidth * squareSize.width;
+        	float dCurrentHeight = nHeight * squareSize.height;
+        	corners.push_back(cv::Point3f(dCurrentWidth, dCurrentHeight, 0.0));
+        }
+    }
+}
+
 /**
  *
  * @param boardSize			size of the async circle grid
@@ -200,12 +220,12 @@ int main(int argc, char** argv)
 {
 	// parse command line arguments
     cv::CommandLineParser parser(argc, argv,
-                                 "{w|4|board width}"
-                                 "{h|11|board height}"
-                                 "{sw|0.06|square width}"
-                                 "{sh|0.06|square height}"
+                                 "{w|8|board width}"
+                                 "{h|6|board height}"
+                                 "{sw|0.024|square width}"
+                                 "{sh|0.024|square height}"
                                  "{o|out_camera_params.xml|output file}"
-    							 "{t|/usb_cam/image_raw|ros image topic}"
+    							 "{t|/JaRen/usb_cam/image_raw|ros image topic}"
                                  "{help||show help}"
                                  );
     parser.about("This is the omnidirectional camera calibration. Example command line:\n"
@@ -228,13 +248,18 @@ int main(int argc, char** argv)
         return -1;
     }
 
+    bool bIsChessboard = true;
+
     // calculate object coordinates
     std::vector<std::vector<cv::Point3f>> objectPoints(1);
-    calcAsyncCircleCorners(boardSize, squareSize, objectPoints[0]);
+    if (bIsChessboard)
+    	calcChessBoardCorners(boardSize, squareSize, objectPoints[0]);
+    else
+    	calcAsyncCircleCorners(boardSize, squareSize, objectPoints[0]);
 
     // start the live calibration
 	ros::init(argc, argv, "live_calibration");
-    CCalibrateOmniCamera oCalibrate(outputFilename, objectPoints, boardSize, sTopicName);
+    CCalibrateOmniCamera oCalibrate(outputFilename, objectPoints, boardSize, sTopicName, bIsChessboard);
     ros::spin();
     return 0;
 

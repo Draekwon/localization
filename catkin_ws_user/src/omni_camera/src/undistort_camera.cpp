@@ -34,12 +34,16 @@ public:
 	COmniCameraUndistortion(const std::string& sInputTopic, const std::string& sOutputTopic, const cv::Mat& oCameraMatrix, const cv::Mat& oDistCoeffs, const cv::Mat& oXi)
 	: m_oImgTransport(m_oNodeHandle), m_oXi(oXi), m_oCameraMatrix(oCameraMatrix), m_oDistCoeffs(oDistCoeffs)
 	{
+		cv::namedWindow("window", cv::WINDOW_NORMAL);
+
 		m_oImagePub = m_oImgTransport.advertise(sOutputTopic, 1);
 		m_oImageSub = m_oImgTransport.subscribe(sInputTopic, 1,
 				  &COmniCameraUndistortion::ImageCallback, this, image_transport::TransportHints("compressed"));
 	}
 
 private:
+
+	int nCounter = 0;
 
 	void ImageCallback(const sensor_msgs::ImageConstPtr& msg)
 	{
@@ -63,6 +67,9 @@ private:
 				sensor_msgs::image_encodings::BGR8, oUndistortedImg).toImageMsg();
 		// Output modified video stream
 		m_oImagePub.publish(oPubMsg);
+
+		cv::imshow("window", oUndistortedImg);
+		cv::waitKey(1);
 	}
 };
 
@@ -100,7 +107,7 @@ int main(int argc, char** argv)
 	// parse command line arguments
     cv::CommandLineParser parser(argc, argv,
                                  "{i|out_camera_params.xml|input file}"
-								 "{ti|/usb_cam/image_raw|ros image topic}"
+								 "{ti|/JaRen/usb_cam/image_raw|ros image topic}"
 			 	 	 	 	 	 "{to|/omni_undistorted|undistorted image topic}"
                                  "{help||show help}"
                                  );
