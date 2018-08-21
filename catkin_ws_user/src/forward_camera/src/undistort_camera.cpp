@@ -6,7 +6,6 @@
 #include <string>
 #include <time.h>
 // opencv
-#include "opencv2/ccalib/omnidir.hpp"
 #include "opencv2/core.hpp"
 #include "opencv2/imgproc.hpp"
 #include "opencv2/calib3d.hpp"
@@ -19,10 +18,10 @@
 #include "sensor_msgs/image_encodings.h"
 
 
-const std::string PACKAGE_NAME = "omni_camera";
+const std::string PACKAGE_NAME = "forward_camera";
 
 
-class COmniCameraUndistortion
+class CForwardCameraUndistortion
 {
 
 	ros::NodeHandle m_oNodeHandle;
@@ -30,18 +29,31 @@ class COmniCameraUndistortion
 	image_transport::Subscriber m_oImageSub;
 	image_transport::Publisher m_oImagePub;
 
-	const cv::Mat m_oCameraMatrix, m_oDistCoeffs, m_oXi;
+	bool m_bWithUndistortion	= true;
+
+	const cv::Mat m_oCameraMatrix, m_oDistCoeffs;
 
 public:
 
-	COmniCameraUndistortion(const std::string& sInputTopic, const std::string& sOutputTopic, const cv::Mat& oCameraMatrix, const cv::Mat& oDistCoeffs, const cv::Mat& oXi)
-	: m_oImgTransport(m_oNodeHandle), m_oXi(oXi), m_oCameraMatrix(oCameraMatrix), m_oDistCoeffs(oDistCoeffs)
+	CForwardCameraUndistortion(const std::string& sInputTopic, const std::string& sOutputTopic, const cv::Mat& oCameraMatrix, const cv::Mat& oDistCoeffs)
+	: m_oImgTransport(m_oNodeHandle),  m_oCameraMatrix(oCameraMatrix), m_oDistCoeffs(oDistCoeffs)
 	{
 		cv::namedWindow("window", cv::WINDOW_NORMAL);
 
 		m_oImagePub = m_oImgTransport.advertise(sOutputTopic, 1);
 		m_oImageSub = m_oImgTransport.subscribe(sInputTopic, 1,
-				  &COmniCameraUndistortion::ImageCallback, this, image_transport::TransportHints("compressed"));
+				  &CForwardCameraUndistortion::ImageCallback, this, image_transport::TransportHints("compressed"));
+	}
+
+	CForwardCameraUndistortion(const std::string& sInputTopic, const std::string& sOutputTopic)
+	: m_oImgTransport(m_oNodeHandle)
+	{
+		cv::namedWindow("window", cv::WINDOW_NORMAL);
+		m_bWithUndistortion = false;
+
+		m_oImagePub = m_oImgTransport.advertise(sOutputTopic, 1);
+		m_oImageSub = m_oImgTransport.subscribe(sInputTopic, 1,
+				  &CForwardCameraUndistortion::ImageCallback, this, image_transport::TransportHints("compressed"));
 	}
 
 private:
@@ -54,7 +66,7 @@ private:
 		cv_bridge::CvImagePtr pCvImg;
 		try
 		{
-		  pCvImg = cv_bridge::toCvCopy(msg, sensor_msgs::image_encodings::BGR8);
+		  pCvImg = cv_bridge::toCvCopy(msg, sensor_msgs::image_encodings::MONO8);
 		}
 		catch (cv_bridge::Exception& e)
 		{
@@ -64,14 +76,26 @@ private:
 
 		cv::Mat oUndistortedImg;
 
-		cv::omnidir::undistortImage(pCvImg->image, oUndistortedImg, m_oCameraMatrix, m_oDistCoeffs, m_oXi, cv::omnidir::RECTIFY_PERSPECTIVE);
+		if (m_bWithUndistortion)
+		{
+			cv::undistort(pCvImg->image, oUndistortedImg, m_oCameraMatrix, m_oDistCoeffs);
+			pCvImg->image = oUndistortedImg;
+		}
+
+		cv::Point2f aImagePoints[4];
+		cv::Point2f aObjectPoints[4];
+
+
+
+
+		// TODO: add rectify perspective
 
 		sensor_msgs::ImagePtr oPubMsg = cv_bridge::CvImage(std_msgs::Header(),
-				sensor_msgs::image_encodings::BGR8, oUndistortedImg).toImageMsg();
+				sensor_msgs::image_encodings::MONO8, pCvImg->image).toImageMsg();
 		// Output modified video stream
 		m_oImagePub.publish(oPubMsg);
 
-		cv::imshow("window", oUndistortedImg);
+		cv::imshow("window", pCvImg->image);
 		cv::waitKey(1);
 	}
 };
@@ -79,7 +103,7 @@ private:
 
 
 static bool ReadConfigFile(const std::string& sConfigFile, cv::Mat& cameraMatrix,
-	    cv::Mat& distCoeffs, cv::Mat& xi)
+	    cv::Mat& distCoeffs)
 {
 	cv::FileStorage oFilestorage(sConfigFile, cv::FileStorage::READ);
 
@@ -93,7 +117,6 @@ static bool ReadConfigFile(const std::string& sConfigFile, cv::Mat& cameraMatrix
     oFilestorage["rms"] >> rms;
     oFilestorage["camera_matrix"] >> cameraMatrix;
     oFilestorage["distortion_coefficients"] >> distCoeffs;
-    oFilestorage["xi"] >> xi;
 
     std::string buf;
     oFilestorage["calibration_time"] >> buf;
@@ -110,11 +133,11 @@ int main(int argc, char** argv)
 	// parse command line arguments
     cv::CommandLineParser parser(argc, argv,
                                  "{i|out_camera_params.xml|input file}"
-								 "{ti|/JaRen/usb_cam/image_raw|ros image topic}"
-			 	 	 	 	 	 "{to|/omni_undistorted|undistorted image topic}"
+								 "{ti|/JaRen/app/camera/rgb/image_rect_mono|ros image topic}"
+			 	 	 	 	 	 "{to|/forward_rectified|rectified image topic}"
                                  "{help||show help}"
                                  );
-    parser.about("This is a sample for omnidirectional camera calibration. Example command line:\n"
+    parser.about("This is forward camera undistortion. Example command line:\n"
                  "    undistort_camera -i=out_camera_params.xml -ti=/usb_cam/image_raw -to=/omni_undistorted \n");//
     if (parser.has("help"))
     {
@@ -132,14 +155,14 @@ int main(int argc, char** argv)
         return -1;
     }
 
-    cv::Mat cameraMatrix, distCoeffs, xi;
+    cv::Mat cameraMatrix, distCoeffs;
 
-    if (!ReadConfigFile(sConfigFile, cameraMatrix, distCoeffs, xi))
-    	return -1;
+	ros::init(argc, argv, "forward_undistortion");
 
-    // start the live calibration
-	ros::init(argc, argv, "omni_undistortion");
-	COmniCameraUndistortion oCalibrate(sTopicIn, sTopicOut, cameraMatrix, distCoeffs, xi);
+    if (!ReadConfigFile(sConfigFile, cameraMatrix, distCoeffs))
+    	CForwardCameraUndistortion oCalibrate(sTopicIn, sTopicOut);
+    else
+    	CForwardCameraUndistortion oCalibrate(sTopicIn, sTopicOut, cameraMatrix, distCoeffs);
     ros::spin();
     return 0;
 

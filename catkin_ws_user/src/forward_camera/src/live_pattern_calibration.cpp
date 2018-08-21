@@ -6,7 +6,6 @@
 #include <string>
 #include <time.h>
 // opencv
-#include "opencv2/ccalib/omnidir.hpp"
 #include "opencv2/core.hpp"
 #include "opencv2/imgproc.hpp"
 #include "opencv2/calib3d.hpp"
@@ -19,11 +18,11 @@
 #include "sensor_msgs/image_encodings.h"
 
 
-const std::string PACKAGE_NAME = "omni_camera";
+const std::string PACKAGE_NAME = "forward_camera";
 const bool bIsChessboard = true;
 
 
-class CCalibrateOmniCamera
+class CCalibrateForwardCamera
 {
 private:
 
@@ -44,7 +43,7 @@ private:
 
 public:
 
-	CCalibrateOmniCamera(std::string sOutputFilename, std::vector<std::vector<cv::Point3f>>& aObjectPoints, cv::Size& oBoardSize,
+	CCalibrateForwardCamera(std::string sOutputFilename, std::vector<std::vector<cv::Point3f>>& aObjectPoints, cv::Size& oBoardSize,
 			std::string sImageTopic, bool bIsChessboard)
 	: m_oImgTransport(m_oNodeHandle), m_pButtonClicked(new bool(false)), m_bIsChessboard(bIsChessboard)
 	{
@@ -53,14 +52,14 @@ public:
 		m_oBoardSize 		= oBoardSize;
 
 		cv::namedWindow(m_sWindowName, cv::WINDOW_GUI_EXPANDED);
-		cv::createButton("Calibrate now.", CCalibrateOmniCamera::CalibrateButton, m_pButtonClicked, cv::QT_PUSH_BUTTON);
+		cv::createButton("Calibrate now.", CCalibrateForwardCamera::CalibrateButton, m_pButtonClicked, cv::QT_PUSH_BUTTON);
 		cv::displayStatusBar(m_sWindowName, "0 valid frames received.");
 
 		m_oImageSub = m_oImgTransport.subscribe(sImageTopic, 50,
-				  &CCalibrateOmniCamera::ImageCallback, this, image_transport::TransportHints("compressed"));
+				  &CCalibrateForwardCamera::ImageCallback, this, image_transport::TransportHints("compressed"));
 	}
 
-	~CCalibrateOmniCamera()
+	~CCalibrateForwardCamera()
 	{
 		m_oImageSub.shutdown();
 		cv::destroyWindow(m_sWindowName);
@@ -124,15 +123,14 @@ private:
 		// run calibration, some images are discarded in calibration process because they are failed
 		// in initialization. Retained image indexes are in idx variable.
 		int flags = 0;
-		cv::Mat K, D, xi, idx;
+		cv::Mat K, D;
 		std::vector<cv::Vec3d> rvecs, tvecs;
 		double rms;
 		cv::TermCriteria criteria(3, 200, 1e-8);
-		rms = cv::omnidir::calibrate(m_aObjectPoints, m_aImagePoints, m_oImageSize, K, xi, D, rvecs, tvecs, flags, criteria, idx);
+		rms = cv::calibrateCamera(m_aObjectPoints, m_aImagePoints, m_oImageSize, K, D, rvecs, tvecs, flags, criteria);
 		std::cout << "rms: " << rms << std::endl;
 		std::cout << "Saving camera params to " << m_sOutputFilename << std::endl;
-		saveCameraParams(m_sOutputFilename, K, D, xi,
-			rvecs, tvecs, rms);
+		saveCameraParams(m_sOutputFilename, K, D, rvecs, tvecs, rms);
 
 		std::ostringstream strs;
 		strs << "calibration error: " << rms;
@@ -152,7 +150,7 @@ private:
 	}
 
 	static void saveCameraParams( const std::string & filename, const cv::Mat& cameraMatrix,
-	    const cv::Mat& distCoeffs, const cv::Mat& xi, const std::vector<cv::Vec3d>& rvecs, const std::vector<cv::Vec3d>& tvecs,
+	    const cv::Mat& distCoeffs, const std::vector<cv::Vec3d>& rvecs, const std::vector<cv::Vec3d>& tvecs,
 		const double rms)
 	{
 	    cv::FileStorage fs( filename, cv::FileStorage::WRITE );
@@ -167,7 +165,6 @@ private:
 	    fs << "rms" << rms;
 	    fs << "camera_matrix" << cameraMatrix;
 	    fs << "distortion_coefficients" << distCoeffs;
-	    fs << "xi" << xi;
 
 	    if ( !rvecs.empty() && !tvecs.empty() )
 	    {
@@ -229,11 +226,11 @@ int main(int argc, char** argv)
                                  "{sw|0.024|square width}"
                                  "{sh|0.024|square height}"
                                  "{o|out_camera_params.xml|output file}"
-    							 "{t|/JaRen/usb_cam/image_raw|ros image topic}"
+    							 "{t|/JaRen/app/camera/image_rect/mono|ros image topic}"
                                  "{help||show help}"
                                  );
-    parser.about("This is the omnidirectional camera calibration. Example command line:\n"
-                 "    omni_calibration -w=4 -h=11 -sw=0.06 -sh=0.06 \n");//
+    parser.about("This is the forward camera calibration. Example command line:\n"
+                 "    forward_calibration -w=4 -h=11 -sw=0.06 -sh=0.06 \n");//
     if (parser.has("help"))
     {
         parser.printMessage();
@@ -252,6 +249,7 @@ int main(int argc, char** argv)
         return -1;
     }
 
+
     // calculate object coordinates
     std::vector<std::vector<cv::Point3f>> objectPoints(1);
     if (bIsChessboard)
@@ -261,7 +259,7 @@ int main(int argc, char** argv)
 
     // start the live calibration
 	ros::init(argc, argv, "live_calibration");
-    CCalibrateOmniCamera oCalibrate(outputFilename, objectPoints, boardSize, sTopicName, bIsChessboard);
+    CCalibrateForwardCamera oCalibrate(outputFilename, objectPoints, boardSize, sTopicName, bIsChessboard);
     ros::spin();
     return 0;
 

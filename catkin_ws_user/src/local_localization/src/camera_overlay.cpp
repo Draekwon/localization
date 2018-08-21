@@ -63,6 +63,8 @@ class CCameraOverlay
 	bool 	m_bPublishOverlay;
 	double	m_fScaleFactor;
 
+	bool m_bIsFrontFacingCamera = false;
+
 	std::string m_sWindowName = "CamOverlay";
 
 public:
@@ -78,7 +80,7 @@ public:
 		std::string sImagePath = ros::package::getPath(PACKAGE_NAME) + "/images/";
 		std::string sMapPath = ros::package::getPath(PACKAGE_NAME) + "/mapTables/";
 
-		m_oMapImg = imread(sImagePath + "Lab_map_600x400.png", cv::IMREAD_GRAYSCALE);
+		m_oMapImg = imread(sImagePath + "fu_robotics_lab_map.jpg", cv::IMREAD_GRAYSCALE);
 
 		cv::FileStorage fs(sMapPath + "forcemap.xml", cv::FileStorage::READ);
 		fs["ForceMap"] >> m_oForceMap;
@@ -106,7 +108,7 @@ public:
 			m_oImagePub = m_oImgTransport.advertise("/camera_overlay", 1);
 
 		// Subscribe to input video feed
-		m_oImageSub = m_oImgTransport.subscribe("/usb_cam/image_undistorted", 1,
+		m_oImageSub = m_oImgTransport.subscribe("/omni_undistorted", 1,
 		  &CCameraOverlay::ImageCallback, this, image_transport::TransportHints("compressed"));
 		m_oOdomSub = m_oNodeHandle.subscribe("/odom", 1, &CCameraOverlay::OdomCallback, this);
 	}
@@ -131,39 +133,23 @@ public:
 	 * @param fYaw			the angle in radians
 	 * @param oCenter		the assumed position of the car in pixel coordinates
 	 */
-	void PublishMapOverlay(cv::Mat oContourImg, double fYaw, cv::Point oCenter)
+	void PublishMapOverlay(cv::Mat oContourImg, cv::Mat oRotMat, cv::Point oCenter)
 	{
-		cv::Mat oRotatedImg = GetRotatedImg(oContourImg, fYaw);
-
-		cv::Point oMatrixMinimum(0 - m_oMapImg.cols / 2, 0 - m_oMapImg.rows / 2);
-		cv::Point oMatrixMaximum(m_oMapImg.cols + m_oMapImg.cols / 2, m_oMapImg.rows + m_oMapImg.rows / 2);
-
-		cv::Point oTopLeft(oCenter.x - oRotatedImg.cols / 2, oCenter.y - oRotatedImg.rows / 2);
-		cv::Point oBottomRight(oTopLeft.x + oRotatedImg.cols, oTopLeft.y + oRotatedImg.rows);
-
-		int nCroppedX = oTopLeft.x < oMatrixMinimum.x ? oMatrixMinimum.x - oTopLeft.x : 0;
-		int nCroppedY = oTopLeft.y < oMatrixMinimum.y ? oMatrixMinimum.y - oTopLeft.y : 0;
-		int nCroppedX2 = oBottomRight.x > oMatrixMaximum.x ? oBottomRight.x - oMatrixMaximum.x : 0;
-		int nCroppedY2 = oBottomRight.y > oMatrixMaximum.y ? oBottomRight.y - oMatrixMaximum.y : 0;
-		int nCroppedWidth = oRotatedImg.cols - nCroppedX - nCroppedX2;
-		int nCroppedHeight = oRotatedImg.rows - nCroppedY - nCroppedY2;
-
-		cv::Rect oCropRoi(nCroppedX, nCroppedY, nCroppedWidth, nCroppedHeight);
-		cv::Mat oCroppedRotatedImage = oRotatedImg(oCropRoi);
-
-		cv::Point oCroppedTopLeft(oTopLeft.x + nCroppedX, oTopLeft.y + nCroppedY);
-
-//		// publish the overlay to double check rotation and stuff
-		cv::Rect oRegionOfInterest = cv::Rect(oCroppedTopLeft, oCroppedRotatedImage.size());
 
 		cv::Mat oMapImg = cv::Mat::zeros(m_oMapImg.size() * 2, CV_8UC1);
+		cv::Rect2f oBoundingBox(cv::Point2f(0,0), oMapImg.size());
+
+	    cv::Mat oRotatedImage;
+	    warpAffine(oContourImg, oRotatedImage, oRotMat, oBoundingBox.size());
+
+//		// publish the overlay to double check rotation and stuff
+		cv::Rect oRegionOfInterest = cv::Rect(oBoundingBox);
+
 		m_oMapImg.copyTo(oMapImg(cv::Rect(oMapImg.size() / 4, m_oMapImg.size())));
-		oRegionOfInterest.x += oMapImg.cols / 4;
-		oRegionOfInterest.y += oMapImg.rows / 4;
 		oCenter.x += oMapImg.cols / 4;
 		oCenter.y += oMapImg.rows / 4;
 		cv::Mat oDestinationRoi = oMapImg(oRegionOfInterest);
-		oCroppedRotatedImage.copyTo(oDestinationRoi, oCroppedRotatedImage);
+		oRotatedImage.copyTo(oDestinationRoi, oRotatedImage);
 		cv::circle(oMapImg, oCenter, 10, 255, -1);
 
 		sensor_msgs::ImagePtr oPubMsg = cv_bridge::CvImage(std_msgs::Header(),
@@ -172,30 +158,6 @@ public:
 		m_oImagePub.publish(oPubMsg);
 	}
 
-	/**
-	 * this method rotates the camera image for a visualization of where the camera image is related to the map
-	 * @param oContourImg	contour-image of the camera image
-	 * @param fYaw			angle by which to turn the image in rad
-	 * @return				properly rotated image
-	 */
-	cv::Mat GetRotatedImg(cv::Mat oContourImg, double fYaw)
-	{
-		// I have no idea why the following should be necessary...
-		fYaw = fYaw * 180 / M_PI;
-		// what this does is, it converts from radians to degrees and then switches front and back.
-
-		cv::Point2f oImageCenter((oContourImg.cols - 1) / 2.0, (oContourImg.rows - 1) / 2.0);
-		cv::Mat oRotMat = getRotationMatrix2D(oImageCenter, fYaw, 1.0);
-
-		cv::Rect2f oBoundingBox = cv::RotatedRect(oImageCenter, oContourImg.size(), fYaw).boundingRect2f();
-	    oRotMat.at<double>(0,2) += oBoundingBox.width / 2.0 - oContourImg.cols / 2.0;
-	    oRotMat.at<double>(1,2) += oBoundingBox.height / 2.0 - oContourImg.rows / 2.0;
-
-	    cv::Mat oRotatedImage;
-	    warpAffine(oContourImg, oRotatedImage, oRotMat, oBoundingBox.size());
-
-	    return oRotatedImage;
-	}
 
 	/**
 	 *
@@ -207,22 +169,37 @@ public:
 	 * @param fYaw			current assumed rotation of the car in radians
 	 * @return				the transformation matrix
 	 */
-	cv::Mat GetTransformationMatrix(int nCamWidth, int nCamHeight, int nMapWidth, int nMapHeight, cv::Point oCenter, double fYaw)
+	cv::Mat GetTransformationMatrix(int nCamWidth, int nCamHeight, int nMapWidth, int nMapHeight, cv::Point oCenter, double dYaw)
 	{
 		// I have no idea why the following should be necessary...
-		fYaw = fYaw * 180 / M_PI;
+		dYaw = dYaw * 180 / M_PI;
 		// what this does is, it converts from radians to degrees and then switches front and back.
 		// front and back switch is simple: camera image is reversed.
 		// but radians -> degrees? no idea.
 
-		// turn the image points around the image center
-		cv::Point2f oRotationCenter(nCamWidth / 2.0, nCamHeight / 2.0);
-		cv::Mat oRotMat = getRotationMatrix2D(oRotationCenter, fYaw, 1.0);
-		// add a translation to the matrix
-		oRotMat.at<double>(0,2) += nMapWidth / 2 + oCenter.x - nCamWidth/2.0;
-		oRotMat.at<double>(1,2) += nMapHeight / 2 + oCenter.y - nCamHeight/2.0;
+		if (m_bIsFrontFacingCamera)
+		{
+			// turn the image points around the image center
+			cv::Point2f oRotationCenter(nCamWidth / 2.0, nCamHeight);
+			cv::Mat oRotMat = getRotationMatrix2D(oRotationCenter, dYaw, 1.0);
+			// add a translation to the matrix
+			oRotMat.at<double>(0,2) += nMapWidth / 2 + oCenter.x - nCamWidth/2.0;
+			oRotMat.at<double>(1,2) += nMapHeight / 2 + oCenter.y - nCamHeight;
 
-		return oRotMat;
+			return oRotMat;
+		}
+		else
+		{
+			// turn the image points around the image center
+			cv::Point2f oRotationCenter(nCamWidth / 2.0, nCamHeight / 2.0);
+			cv::Mat oRotMat = getRotationMatrix2D(oRotationCenter, dYaw, 1.0);
+			// add a translation to the matrix
+			oRotMat.at<double>(0,2) += nMapWidth / 2 + oCenter.x - nCamWidth/2.0;
+			oRotMat.at<double>(1,2) += nMapHeight / 2 + oCenter.y - nCamHeight/2.0;
+
+			return oRotMat;
+		}
+
 	}
 
 	/**
@@ -285,22 +262,26 @@ public:
 		oCameraImg = oScaledImage;
 
 		// hide the car
-		cv::Rect oModelCarRect(cv::Rect(oCameraImg.cols / 2 - CAR_SIZE.width / 2,
-				oCameraImg.rows / 2 - CAR_SIZE.height / 2,
-				CAR_SIZE.width, CAR_SIZE.height));
-		cv::Mat emptyMat = cv::Mat::zeros(CAR_SIZE.height, CAR_SIZE.width, CV_8UC3);
-		emptyMat.copyTo(oCameraImg(oModelCarRect));
+		if (!m_bIsFrontFacingCamera)
+		{
+			cv::Rect oModelCarRect(cv::Rect(oCameraImg.cols / 2 - CAR_SIZE.width / 2,
+					oCameraImg.rows / 2 - CAR_SIZE.height / 2,
+					CAR_SIZE.width, CAR_SIZE.height));
+			cv::Mat emptyMat = cv::Mat::zeros(CAR_SIZE.height, CAR_SIZE.width, CV_8UC3);
+			emptyMat.copyTo(oCameraImg(oModelCarRect));
+
+
+			// flip by y axis
+			cv::Mat oFlippedImg;
+			cv::flip(oCameraImg, oFlippedImg, 1);
+			// rotate by 90 degrees
+			cv::rotate(oFlippedImg, oCameraImg, cv::ROTATE_90_COUNTERCLOCKWISE);
+		}
 
 		cv::Mat oHsvImg;
 		cvtColor(oCameraImg, oHsvImg, CV_BGR2HSV);
 		cv::Mat oRangedImg;
-		cv::inRange(oHsvImg, cv::Scalar(0, 0, 50), cv::Scalar(255, 100, 255), oRangedImg);
-
-		// flip by y axis
-		cv::Mat oFlippedImg;
-		cv::flip(oRangedImg, oFlippedImg, 1);
-		// rotate by 90 degrees
-		cv::rotate(oFlippedImg, oRangedImg, cv::ROTATE_90_COUNTERCLOCKWISE);
+		cv::inRange(oHsvImg, cv::Scalar(0, 0, 150), cv::Scalar(255, 100, 255), oRangedImg);
 
 		return oRangedImg;
 	}
@@ -371,7 +352,7 @@ public:
 			std::cout << "Position: " << oPosition << ", forcevector: " << oForceVector << std::endl;
 
 			if (m_bPublishOverlay)
-				PublishMapOverlay(oPreparedCameraImg, -fDifferentialYaw, cv::Point(oCenter));
+				PublishMapOverlay(oPreparedCameraImg, oTransformationMat, oCenter);
 
 			nav_msgs::Odometry odom;
 			odom.header.stamp = ros::Time::now();
