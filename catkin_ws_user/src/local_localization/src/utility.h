@@ -50,6 +50,18 @@ double GetDistance(cv::Point2d oP1, cv::Point2d oP2)
 }
 
 /**
+ * calculates euclidean distance between two points:
+ * sqrt( (P1.x - P2.x)² + (P1.y - P2.y)² + (P1.z - P2.z)² )
+ * @param oP1	Point2d 1
+ * @param oP2	Point2d 2
+ * @return		euclidean distance between the points
+ */
+double GetDistance(cv::Point3d oP1, cv::Point3d oP2)
+{
+	return sqrt(pow(oP1.x - oP2.x, 2) + pow(oP1.y - oP2.y, 2) + pow(oP1.z - oP2.z, 2));
+}
+
+/**
  * calculates length of a vector by calculating the distance between (0,0) and the Vector
  * @param oVec	Vector, represented as Point2d
  * @return		length of the Vector
@@ -57,6 +69,16 @@ double GetDistance(cv::Point2d oP1, cv::Point2d oP2)
 double GetVectorLength(cv::Point2d oVec)
 {
 	return GetDistance(cv::Point2d(0,0), oVec);
+}
+
+/**
+ * calculates length of a vector by calculating the distance between (0,0,0) and the Vector
+ * @param oVec	Vector, represented as Point2d
+ * @return		length of the Vector
+ */
+double GetVectorLength(cv::Point3d oVec)
+{
+	return GetDistance(cv::Point3d(0,0,0), oVec);
 }
 
 //! copy the following code for benchmarking:

@@ -55,7 +55,7 @@ public:
 		cv::createButton("Calibrate now.", CCalibrateForwardCamera::CalibrateButton, m_pButtonClicked, cv::QT_PUSH_BUTTON);
 		cv::displayStatusBar(m_sWindowName, "0 valid frames received.");
 
-		m_oImageSub = m_oImgTransport.subscribe(sImageTopic, 50,
+		m_oImageSub = m_oImgTransport.subscribe(sImageTopic, 5,
 				  &CCalibrateForwardCamera::ImageCallback, this, image_transport::TransportHints("compressed"));
 	}
 
@@ -226,7 +226,7 @@ int main(int argc, char** argv)
                                  "{sw|0.024|square width}"
                                  "{sh|0.024|square height}"
                                  "{o|out_camera_params.xml|output file}"
-    							 "{t|/JaRen/app/camera/image_rect/mono|ros image topic}"
+    							 "{t|/JaRen/app/camera/rgb/image_rect_mono|ros image topic}"
                                  "{help||show help}"
                                  );
     parser.about("This is the forward camera calibration. Example command line:\n"

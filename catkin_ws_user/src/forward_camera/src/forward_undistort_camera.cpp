@@ -38,7 +38,7 @@ public:
 	CForwardCameraUndistortion(const std::string& sInputTopic, const std::string& sOutputTopic, const cv::Mat& oCameraMatrix, const cv::Mat& oDistCoeffs)
 	: m_oImgTransport(m_oNodeHandle),  m_oCameraMatrix(oCameraMatrix), m_oDistCoeffs(oDistCoeffs)
 	{
-		cv::namedWindow("window", cv::WINDOW_NORMAL);
+//		cv::namedWindow("window", cv::WINDOW_NORMAL);
 
 		m_oImagePub = m_oImgTransport.advertise(sOutputTopic, 1);
 		m_oImageSub = m_oImgTransport.subscribe(sInputTopic, 1,
@@ -46,10 +46,9 @@ public:
 	}
 
 	CForwardCameraUndistortion(const std::string& sInputTopic, const std::string& sOutputTopic)
-	: m_oImgTransport(m_oNodeHandle)
+	: m_oImgTransport(m_oNodeHandle), m_bWithUndistortion(false)
 	{
 		cv::namedWindow("window", cv::WINDOW_NORMAL);
-		m_bWithUndistortion = false;
 
 		m_oImagePub = m_oImgTransport.advertise(sOutputTopic, 1);
 		m_oImageSub = m_oImgTransport.subscribe(sInputTopic, 1,
@@ -62,11 +61,10 @@ private:
 
 	void ImageCallback(const sensor_msgs::ImageConstPtr& msg)
 	{
-
 		cv_bridge::CvImagePtr pCvImg;
 		try
 		{
-		  pCvImg = cv_bridge::toCvCopy(msg, sensor_msgs::image_encodings::MONO8);
+		  pCvImg = cv_bridge::toCvCopy(msg, sensor_msgs::image_encodings::BGR8);
 		}
 		catch (cv_bridge::Exception& e)
 		{
@@ -74,10 +72,15 @@ private:
 		  return;
 		}
 
-		cv::Mat oUndistortedImg;
+		cv::Mat oHsvImg;
+		cvtColor(pCvImg->image, oHsvImg, CV_BGR2HSV);
+		cv::Mat oRangedImg;
+		cv::inRange(oHsvImg, cv::Scalar(0, 0, 175), cv::Scalar(255, 100, 255), oRangedImg);
+		pCvImg->image = oRangedImg;
 
 		if (m_bWithUndistortion)
 		{
+			cv::Mat oUndistortedImg;
 			cv::undistort(pCvImg->image, oUndistortedImg, m_oCameraMatrix, m_oDistCoeffs);
 			pCvImg->image = oUndistortedImg;
 		}
@@ -85,10 +88,22 @@ private:
 		cv::Point2f aImagePoints[4];
 		cv::Point2f aObjectPoints[4];
 
+		aImagePoints[0] = cv::Point2f(220,359);
+		aImagePoints[1] = cv::Point2f(452,365);
+		aImagePoints[2] = cv::Point2f(254,309);
+		aImagePoints[3] = cv::Point2f(401,315);
 
+		aObjectPoints[0] = cv::Point2f(316.5, 360);
+		aObjectPoints[1] = cv::Point2f(363.5, 361);
+		aObjectPoints[2] = cv::Point2f(317, 280);
+		aObjectPoints[3] = cv::Point2f(363, 281);
 
+		cv::Mat mPerspectiveTransform = cv::getPerspectiveTransform(aImagePoints, aObjectPoints);
+		cv::Mat mRectifiedImg;
 
-		// TODO: add rectify perspective
+		cv::warpPerspective(pCvImg->image, mRectifiedImg, mPerspectiveTransform, pCvImg->image.size());
+		pCvImg->image = mRectifiedImg;
+
 
 		sensor_msgs::ImagePtr oPubMsg = cv_bridge::CvImage(std_msgs::Header(),
 				sensor_msgs::image_encodings::MONO8, pCvImg->image).toImageMsg();
@@ -133,7 +148,7 @@ int main(int argc, char** argv)
 	// parse command line arguments
     cv::CommandLineParser parser(argc, argv,
                                  "{i|out_camera_params.xml|input file}"
-								 "{ti|/JaRen/app/camera/rgb/image_rect_mono|ros image topic}"
+								 "{ti|/JaRen/app/camera/rgb/image_rect_color|ros image topic}"
 			 	 	 	 	 	 "{to|/forward_rectified|rectified image topic}"
                                  "{help||show help}"
                                  );
@@ -160,12 +175,10 @@ int main(int argc, char** argv)
 	ros::init(argc, argv, "forward_undistortion");
 
     if (!ReadConfigFile(sConfigFile, cameraMatrix, distCoeffs))
-    	CForwardCameraUndistortion oCalibrate(sTopicIn, sTopicOut);
-    else
-    	CForwardCameraUndistortion oCalibrate(sTopicIn, sTopicOut, cameraMatrix, distCoeffs);
+    	return -1;
+    CForwardCameraUndistortion oCalibrate(sTopicIn, sTopicOut);
+	//CForwardCameraUndistortion oCalibrate(sTopicIn, sTopicOut, cameraMatrix, distCoeffs);
     ros::spin();
-    return 0;
-
 
     return 0;
 }

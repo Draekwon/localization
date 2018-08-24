@@ -56,7 +56,7 @@ public:
 		cv::createButton("Calibrate now.", CCalibrateOmniCamera::CalibrateButton, m_pButtonClicked, cv::QT_PUSH_BUTTON);
 		cv::displayStatusBar(m_sWindowName, "0 valid frames received.");
 
-		m_oImageSub = m_oImgTransport.subscribe(sImageTopic, 50,
+		m_oImageSub = m_oImgTransport.subscribe(sImageTopic, 5,
 				  &CCalibrateOmniCamera::ImageCallback, this, image_transport::TransportHints("compressed"));
 	}
 

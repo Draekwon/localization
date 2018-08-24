@@ -25,8 +25,8 @@ include
   ${OpenCV_INCLUDE_DIRS}
 )
 
-add_executable( live_pattern_calibration src/live_pattern_calibration.cpp )
-target_link_libraries( live_pattern_calibration ${catkin_LIBRARIES} ${OpenCV_LIBS} )
+add_executable( omni_pattern_calibration src/omni_pattern_calibration.cpp )
+target_link_libraries( omni_pattern_calibration ${catkin_LIBRARIES} ${OpenCV_LIBS} )
 
-add_executable( undistort_camera src/undistort_camera.cpp )
-target_link_libraries( undistort_camera ${catkin_LIBRARIES} ${OpenCV_LIBS} )
+add_executable( omni_undistort_camera src/omni_undistort_camera.cpp )
+target_link_libraries( omni_undistort_camera ${catkin_LIBRARIES} ${OpenCV_LIBS} )
