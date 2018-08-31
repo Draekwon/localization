@@ -389,7 +389,7 @@ public:
 int main(int argc, char **argv)
 {
 	ros::init(argc, argv, "camera_overlay");
-	CCameraOverlay oImgTest(1.0 / 2.0  /*67.0 / 144.0*/);
+	CCameraOverlay oImgTest(1.0 / 3.0  /*67.0 / 144.0*/);
 	ros::spin();
 	return 0;
 }

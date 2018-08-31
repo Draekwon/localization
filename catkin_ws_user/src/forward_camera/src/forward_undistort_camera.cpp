@@ -73,9 +73,9 @@ private:
 		}
 
 		cv::Mat oHsvImg;
-		cvtColor(pCvImg->image, oHsvImg, CV_BGR2HSV);
+		cvtColor(pCvImg->image, oHsvImg, CV_BGR2YUV);
 		cv::Mat oRangedImg;
-		cv::inRange(oHsvImg, cv::Scalar(0, 0, 175), cv::Scalar(255, 100, 255), oRangedImg);
+		cv::inRange(oHsvImg, cv::Scalar(155, 0, 0), cv::Scalar(245, 255, 255), oRangedImg);
 		pCvImg->image = oRangedImg;
 
 		if (m_bWithUndistortion)
@@ -88,23 +88,37 @@ private:
 		cv::Point2f aImagePoints[4];
 		cv::Point2f aObjectPoints[4];
 
-		aImagePoints[0] = cv::Point2f(220,359);
-		aImagePoints[1] = cv::Point2f(452,365);
-		aImagePoints[2] = cv::Point2f(254,309);
-		aImagePoints[3] = cv::Point2f(401,315);
+		aImagePoints[0] = cv::Point2f(37, 351);
+		aImagePoints[1] = cv::Point2f(603, 366);
+		aImagePoints[2] = cv::Point2f(205, 272);
+		aImagePoints[3] = cv::Point2f(429, 276);
 
-		aObjectPoints[0] = cv::Point2f(316.5, 360);
-		aObjectPoints[1] = cv::Point2f(363.5, 361);
-		aObjectPoints[2] = cv::Point2f(317, 280);
-		aObjectPoints[3] = cv::Point2f(363, 281);
+		aObjectPoints[0] = cv::Point2f(218, 405);
+		aObjectPoints[1] = cv::Point2f(422, 405);
+		aObjectPoints[2] = cv::Point2f(218, 75);
+		aObjectPoints[3] = cv::Point2f(422, 75);
 
 		cv::Mat mPerspectiveTransform = cv::getPerspectiveTransform(aImagePoints, aObjectPoints);
 		cv::Mat mRectifiedImg;
 
 		cv::warpPerspective(pCvImg->image, mRectifiedImg, mPerspectiveTransform, pCvImg->image.size());
 		pCvImg->image = mRectifiedImg;
+/*
+		std::vector<std::vector<cv::Point> > contours;
+		std::vector<cv::Vec4i> hierarchy;
+		cv::findContours(pCvImg->image, contours, hierarchy, cv::RETR_LIST, cv::CHAIN_APPROX_SIMPLE);
+		for( size_t i = 0; i< contours.size(); i++ )
+		{
+			double a = contourArea(contours[i]);
+			if (a > 400)
+			{
+				cv::fillConvexPoly(pCvImg->image, contours[i], 0);
+			}
+			std::cout << "contour " << i << " size: " << a << std::endl;
+		}
+		std::cout << std::endl;
 
-
+*/
 		sensor_msgs::ImagePtr oPubMsg = cv_bridge::CvImage(std_msgs::Header(),
 				sensor_msgs::image_encodings::MONO8, pCvImg->image).toImageMsg();
 		// Output modified video stream
@@ -148,7 +162,7 @@ int main(int argc, char** argv)
 	// parse command line arguments
     cv::CommandLineParser parser(argc, argv,
                                  "{i|out_camera_params.xml|input file}"
-								 "{ti|/JaRen/app/camera/rgb/image_rect_color|ros image topic}"
+								 "{ti|/app/camera/rgb/image_rect_color|ros image topic}"
 			 	 	 	 	 	 "{to|/forward_rectified|rectified image topic}"
                                  "{help||show help}"
                                  );
