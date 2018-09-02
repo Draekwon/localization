@@ -20,7 +20,7 @@
 
 
 const std::string PACKAGE_NAME = "omni_camera";
-const bool bIsChessboard = true;
+const bool bIsChessboard = false;
 
 
 class CCalibrateOmniCamera
@@ -224,12 +224,12 @@ int main(int argc, char** argv)
 {
 	// parse command line arguments
     cv::CommandLineParser parser(argc, argv,
-                                 "{w|8|board width}"
-                                 "{h|6|board height}"
-                                 "{sw|0.024|square width}"
-                                 "{sh|0.024|square height}"
+                                 "{w|4|board width}"
+                                 "{h|11|board height}"
+                                 "{sw|0.06|square width}"
+                                 "{sh|0.06|square height}"
                                  "{o|out_camera_params.xml|output file}"
-    							 "{t|/JaRen/usb_cam/image_raw|ros image topic}"
+    							 "{t|/usb_cam/image_raw|ros image topic}"
                                  "{help||show help}"
                                  );
     parser.about("This is the omnidirectional camera calibration. Example command line:\n"

@@ -63,7 +63,7 @@ class CCameraOverlay
 	bool 	m_bPublishOverlay;
 	double	m_fScaleFactor;
 
-	bool m_bIsFrontFacingCamera = true;
+	bool m_bIsFrontFacingCamera = false;
 
 	//! 50 cm distance between the car and the first point it can see in the forward camera perspective
 	const int FOV_DISTANCE_TO_CAR = 50;
@@ -83,7 +83,8 @@ public:
 		std::string sImagePath = ros::package::getPath(PACKAGE_NAME) + "/images/";
 		std::string sMapPath = ros::package::getPath(PACKAGE_NAME) + "/mapTables/";
 
-		m_oMapImg = imread(sImagePath + "fu_robotics_lab_map.jpg", cv::IMREAD_GRAYSCALE);
+//		m_oMapImg = imread(sImagePath + "fu_robotics_lab_map.jpg", cv::IMREAD_GRAYSCALE);
+		m_oMapImg = imread(sImagePath + "Lab_map_600x400.png", cv::IMREAD_GRAYSCALE);
 
 		cv::FileStorage fs(sMapPath + "forcemap.xml", cv::FileStorage::READ);
 		fs["ForceMap"] >> m_oForceMap;
@@ -111,7 +112,9 @@ public:
 			m_oImagePub = m_oImgTransport.advertise("/camera_overlay", 1);
 
 		// Subscribe to input video feed
-		m_oImageSub = m_oImgTransport.subscribe("/forward_rectified", 1,
+//		m_oImageSub = m_oImgTransport.subscribe("/forward_rectified", 1,
+//		  &CCameraOverlay::ImageCallback, this, image_transport::TransportHints("compressed"));
+		m_oImageSub = m_oImgTransport.subscribe("/usb_cam/image_undistorted", 1,
 		  &CCameraOverlay::ImageCallback, this, image_transport::TransportHints("compressed"));
 		m_oOdomSub = m_oNodeHandle.subscribe("/odom", 1, &CCameraOverlay::OdomCallback, this);
 	}
@@ -175,8 +178,8 @@ public:
 	cv::Mat GetTransformationMatrix(int nCamWidth, int nCamHeight, int nMapWidth, int nMapHeight, cv::Point oCenter, double dYaw)
 	{
 		// I have no idea why the following should be necessary...
-		dYaw = dYaw * 180 / M_PI + 180;
-		dYaw = dYaw > 359 ? dYaw - 360 : dYaw;
+		dYaw = dYaw * 180 / M_PI;
+//		dYaw = dYaw > 179 ? dYaw - 360 : dYaw;
 		// what this does is, it converts from radians to degrees and then switches front and back.
 		// front and back switch is simple: camera image is reversed.
 		// but radians -> degrees? no idea.
@@ -282,14 +285,16 @@ public:
 			cv::rotate(oFlippedImg, oCameraImg, cv::ROTATE_90_COUNTERCLOCKWISE);
 		}
 
-		cv::Mat oHsvImg;
-		cv::cvtColor(oCameraImg, oHsvImg, CV_BGR2HSV);
+		cv::Mat oYuvImg;
+		cv::cvtColor(oCameraImg, oYuvImg, CV_BGR2YUV);
 		cv::Mat oRangedImg;
-		cv::inRange(oHsvImg, cv::Scalar(0, 0, 150), cv::Scalar(255, 100, 255), oRangedImg);
+		cv::inRange(oYuvImg, cv::Scalar(120, 0, 0), cv::Scalar(255, 255, 255), oRangedImg);
 
 		return oRangedImg;
 	}
 
+
+	bool m_bIsFirstTime = true;
 
 	/**
 	 * callback for /usb_cam/image_undistorted.
@@ -336,25 +341,49 @@ public:
 			cv::Point2d oForceVector = GetForceVector(oTransformationMat, oPreparedCameraImg, oTorque, oCenter);
 
 
-			if (oTorque > 0)
+			// angle - value = turn left
+			// angle + value = turn right
+			double dAngleCorrection;
+			if (oTorque < 0)
 				// + 0.1 times the yaw difference between now and the last yaw
-				fDifferentialYaw -= abs(fOdomYaw - fOldOdomYaw) * 0.1;
+				dAngleCorrection = (fOldOdomYaw - fOdomYaw);
 			else
 				// - 0.1 times the yaw difference between now and the last yaw
-				fDifferentialYaw += abs(fOdomYaw - fOldOdomYaw) * 0.1;
+				dAngleCorrection = (fOdomYaw - fOldOdomYaw);
 
-			std::cout << "oTorque " << oTorque << ", fDifferentialYaw " << fDifferentialYaw << std::endl;
+			if (dAngleCorrection >= M_PI)
+				dAngleCorrection -= 2 * M_PI;
+			if (dAngleCorrection < -M_PI)
+				dAngleCorrection += 2 * M_PI;
+
+			dAngleCorrection *= 0.1;
+
+			std::cout << "dAngleCorrection: " << dAngleCorrection << std::endl;
+
 			// force vectors are scaled, so that the longest one is 1cm (0.01m)
 			// scale them
 			oForceVector /= GetVectorLength(oForceVector);
 			// 10% of the odometry movement is error correction
 			oForceVector *= GetVectorLength(oOdomPosePosition - oOldOdomPosePosition) * 0.1;
 			//oForceVector *= 0.01; // 1cm
+
+			if (m_bIsFirstTime)
+			{
+				oForceVector = cv::Point2d(0,0);
+				dAngleCorrection = 0;
+				m_bIsFirstTime = false;
+
+			}
+
 			std::cout << "forcevector length " << GetVectorLength(oForceVector) << std::endl;
 			// add the force vector to the position
 			oPosition.x += std::isinf(oForceVector.x) || std::isnan(oForceVector.x) ? 0 : oForceVector.x;
 			oPosition.y += std::isinf(oForceVector.y) || std::isnan(oForceVector.y) ? 0 : oForceVector.y;
 
+			fDifferentialYaw += dAngleCorrection;
+
+
+			std::cout << "oTorque " << oTorque << ", fDifferentialYaw " << fDifferentialYaw << std::endl;
 			std::cout << "Position: " << oPosition << ", forcevector: " << oForceVector << std::endl;
 
 			if (m_bPublishOverlay)
@@ -389,7 +418,8 @@ public:
 int main(int argc, char **argv)
 {
 	ros::init(argc, argv, "camera_overlay");
-	CCameraOverlay oImgTest(1.0 / 3.0  /*67.0 / 144.0*/);
+	CCameraOverlay oImgTest(67.0 / 144.0);
+//	CCameraOverlay oImgTest(1.0 / 3.0);
 	ros::spin();
 	return 0;
 }

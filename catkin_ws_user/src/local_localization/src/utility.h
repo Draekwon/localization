@@ -18,10 +18,10 @@ const std::string PACKAGE_NAME = "local_localization";
 const double M_TO_CM = 100.0;
 const double CM_TO_M = 1.0/100.0;
 //! grid size of the vector field compared to its original image
-const int VECTOR_FIELD_DISTANCE = 10;
+const int VECTOR_FIELD_DISTANCE = 5;
 //! car size is in cm
-//const cv::Size CAR_SIZE = cv::Size(26, 60);
-const cv::Size CAR_SIZE = cv::Size(0, 0);
+const cv::Size CAR_SIZE = cv::Size(26, 60);
+//const cv::Size CAR_SIZE = cv::Size(0, 0);
 
 // convenience functions
 

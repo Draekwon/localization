@@ -110,7 +110,7 @@ int main(int argc, char** argv)
 	// parse command line arguments
     cv::CommandLineParser parser(argc, argv,
                                  "{i|out_camera_params.xml|input file}"
-								 "{ti|/JaRen/usb_cam/image_raw|ros image topic}"
+								 "{ti|/usb_cam/image_raw|ros image topic}"
 			 	 	 	 	 	 "{to|/omni_undistorted|undistorted image topic}"
                                  "{help||show help}"
                                  );
