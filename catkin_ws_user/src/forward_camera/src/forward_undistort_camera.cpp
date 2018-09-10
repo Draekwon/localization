@@ -49,6 +49,7 @@ public:
 	: m_oImgTransport(m_oNodeHandle), m_bWithUndistortion(false)
 	{
 		cv::namedWindow("window", cv::WINDOW_NORMAL);
+		cv::namedWindow("masked", cv::WINDOW_NORMAL);
 
 		m_oImagePub = m_oImgTransport.advertise(sOutputTopic, 1);
 		m_oImageSub = m_oImgTransport.subscribe(sInputTopic, 1,
@@ -57,34 +58,165 @@ public:
 
 private:
 
-	int nCounter = 0;
-
-	void ImageCallback(const sensor_msgs::ImageConstPtr& msg)
+	//! does not work yet
+	void FilterGreenLines(cv::Mat& oImg)
 	{
-		cv_bridge::CvImagePtr pCvImg;
-		try
+		cv::Mat oHsvImg(oImg.size(), CV_8UC3);
+		cvtColor(oImg, oHsvImg, CV_BGR2HSV);
+
+		/// green h: 60°-180° => 42.5 - 127.5
+
+		cv::Mat oRangedImg(oImg.size(), CV_8UC1);
+		cv::inRange(oHsvImg, cv::Scalar(0, 75, 100), cv::Scalar(255, 255, 200), oRangedImg);
+		cv::erode(oRangedImg, oRangedImg, cv::Mat(), cv::Point(-1, -1), 2);
+		cv::dilate(oRangedImg, oRangedImg, cv::Mat(), cv::Point(-1,-1), 2);
+
+
+		// lines to top
+//		for (int x = oImg.cols-1; x >= 0; x--)
+//		{
+//			for (int y = oImg.rows-1; y >= 0; y--)
+//			{
+//				if (oRangedImg.at<uchar>(y,x) > 0)
+//				{
+//					cv::line(oImg, cv::Point(x, 0), cv::Point(x, y), cv::Scalar(0,0,0), 1);
+//					break;
+//				}
+//			}
+//		}
+
+		// lines from bottom center
+		cv::Point oBottomCenter(oImg.cols / 2, oImg.rows);
+		for (int nRow = oImg.rows -1; nRow >= 0; nRow--)
 		{
-		  pCvImg = cv_bridge::toCvCopy(msg, sensor_msgs::image_encodings::BGR8);
+			cv::Point oLeft(0, nRow);
+			cv::Point oRight(oImg.cols - 1, nRow);
+
+			cv::LineIterator oLeftIt(oRangedImg, oBottomCenter, oLeft);
+			cv::LineIterator oRightIt(oRangedImg, oBottomCenter, oRight);
+
+			for(int i = 0; i < oLeftIt.count; i++, ++oLeftIt)
+			{
+				if (oRangedImg.at<uchar>(oLeftIt.pos()) > 0)
+				{
+					cv::line(oImg, oLeftIt.pos(), oLeft, cv::Scalar(0,0,0), 2);
+					break;
+				}
+			}
+			for(int i = 0; i < oRightIt.count; i++, ++oRightIt)
+			{
+				if (oRangedImg.at<uchar>(oRightIt.pos()) > 0)
+				{
+					cv::line(oImg, oRightIt.pos(), oRight, cv::Scalar(0,0,0), 2);
+					break;
+				}
+			}
 		}
-		catch (cv_bridge::Exception& e)
+		for (int nCol = 0; nCol < oImg.cols; nCol++)
 		{
-		  ROS_ERROR("cv_bridge exception: %s", e.what());
-		  return;
+			cv::Point oTop(nCol, 0);
+			cv::LineIterator oTopIt(oRangedImg, oBottomCenter, oTop);
+			for(int i = 0; i < oTopIt.count; i++, ++oTopIt)
+			{
+				if (oRangedImg.at<uchar>(oTopIt.pos()) > 0)
+				{
+					cv::line(oImg, oTopIt.pos(), oTop, cv::Scalar(0,0,0), 2);
+					break;
+				}
+			}
 		}
 
-		cv::Mat oHsvImg;
-		cvtColor(pCvImg->image, oHsvImg, CV_BGR2YUV);
-		cv::Mat oRangedImg;
-		cv::inRange(oHsvImg, cv::Scalar(155, 0, 0), cv::Scalar(245, 255, 255), oRangedImg);
-		pCvImg->image = oRangedImg;
+		cv::imshow("masked", oImg);
+	}
 
-		if (m_bWithUndistortion)
-		{
-			cv::Mat oUndistortedImg;
-			cv::undistort(pCvImg->image, oUndistortedImg, m_oCameraMatrix, m_oDistCoeffs);
-			pCvImg->image = oUndistortedImg;
-		}
 
+	void FilterGreenAttemptTwo(cv::Mat& oImg)
+	{
+		cv::Mat oHsvImg(oImg.size(), CV_8UC3);
+		cvtColor(oImg, oHsvImg, CV_BGR2HSV);
+		/// green h: 60°-180° => 42.5 - 127.5
+		cv::Mat oRangedHsv(oImg.size(), CV_8UC1);
+		cv::inRange(oHsvImg, cv::Scalar(0, 75, 75), cv::Scalar(255, 255, 200), oRangedHsv);
+
+//		cv::Mat oHslImg(oImg.size(), CV_8UC3);
+//		cvtColor(oImg, oHslImg, CV_BGR2HLS);
+//		cv::Mat oRangedHsl(oImg.size(), CV_8UC1);
+//		cv::inRange(oHslImg, cv::Scalar(0, 0, 0), cv::Scalar(255, 255, 50), oRangedHsl);
+
+		cv::Mat oHsvEdges;
+		cv::Canny(oRangedHsv, oHsvEdges, 100, 100);
+		cv::Mat oDilatedHsvEdges;
+		cv::dilate(oHsvEdges, oDilatedHsvEdges, cv::Mat(), cv::Point(-1,-1), 1);
+		oHsvEdges = oDilatedHsvEdges;
+
+	    std::vector<cv::Vec4i> lines;
+	    HoughLinesP( oHsvEdges, lines, 1, CV_PI/180, 200, 40, 10 );
+	    for( size_t i = 0; i < lines.size(); i++ )
+	    {
+	        line( oImg, cv::Point(lines[i][0], lines[i][1]),
+	            cv::Point(lines[i][2], lines[i][3]), cv::Scalar(0,0,255), 3, 8 );
+	    }
+//
+//		std::vector<cv::Vec2f> lines;
+//		cv::HoughLines( oHsvEdges, lines, 1, CV_PI/180, 250 );
+//		for( size_t i = 0; i < lines.size(); i++ )
+//		{
+//			float rho = lines[i][0];
+//			float theta = lines[i][1];
+//			double a = cos(theta), b = sin(theta);
+//			double x0 = a*rho, y0 = b*rho;
+//			cv::Point pt1(cvRound(x0 + 1000*(-b)),
+//					  cvRound(y0 + 1000*(a)));
+//			cv::Point pt2(cvRound(x0 - 1000*(-b)),
+//					  cvRound(y0 - 1000*(a)));
+//			cv::line( oImg, pt1, pt2, cv::Scalar(0,0,255), 3, 8 );
+//		}
+//
+//		cv::Mat oHslEdges;
+//		cv::Canny(oRangedHsl, oHslEdges, 100, 100);
+//		cv::Mat oDilatedHslEdges;
+//		cv::dilate(oHslEdges, oDilatedHslEdges, cv::Mat(), cv::Point(-1,-1), 3);
+//		oHslEdges = oDilatedHslEdges;
+//
+//		cv::Mat oMask;
+//		cv::bitwise_and(oHsvEdges, oHslEdges, oMask);
+//
+//		cv::Mat oWhiteImg(oImg.size(), CV_8UC3, cv::Scalar(255,255,255));
+//		oWhiteImg.copyTo(oImg, oHsvEdges/*oMask*/);
+
+//		cv::Mat channels[3];
+//		cv::split(oHslImg, channels);
+//		cv::imshow("H", channels[0]);
+//		cv::imshow("L", channels[1]);
+//		cv::imshow("S", channels[2]);
+
+		cv::imshow("hsv", oRangedHsv);
+//		cv::imshow("hsl", oRangedHsl);
+		cv::imshow("hsvedges", oHsvEdges);
+//		cv::imshow("hsledges", oHslEdges);
+		cv::imshow("masked", oImg);
+		cv::waitKey(1);
+	}
+
+	void ApplyThresholding(cv::Mat& oImg)
+	{
+		cv::Mat oHlsImg;
+		cvtColor(oImg, oHlsImg, CV_BGR2HLS);
+
+//		cv::Mat channels[3];
+//		cv::split(oHlsImg, channels);
+//		cv::adaptiveThreshold(channels[1], oImg, 255, cv::ADAPTIVE_THRESH_MEAN_C, cv::THRESH_BINARY_INV, 3, 8);
+
+		cv::waitKey(1);
+		cv::inRange(oHlsImg, cv::Scalar(0, 200, 0), cv::Scalar(255, 255, 255), oImg);
+		cv::dilate(oImg, oImg, cv::Mat(), cv::Point(-1, -1), 2);
+		cv::erode(oImg, oImg, cv::Mat(), cv::Point(-1,-1), 1);
+//		cv::dilate(oImg, oImg, cv::Mat(), cv::Point(-1, -1), 1);
+//		oImg = oRangedImg;
+	}
+
+	void WarpPerspective(cv::Mat& oImg)
+	{
 		cv::Point2f aImagePoints[4];
 		cv::Point2f aObjectPoints[4];
 
@@ -101,30 +233,44 @@ private:
 		cv::Mat mPerspectiveTransform = cv::getPerspectiveTransform(aImagePoints, aObjectPoints);
 		cv::Mat mRectifiedImg;
 
-		cv::warpPerspective(pCvImg->image, mRectifiedImg, mPerspectiveTransform, pCvImg->image.size());
-		pCvImg->image = mRectifiedImg;
-/*
-		std::vector<std::vector<cv::Point> > contours;
-		std::vector<cv::Vec4i> hierarchy;
-		cv::findContours(pCvImg->image, contours, hierarchy, cv::RETR_LIST, cv::CHAIN_APPROX_SIMPLE);
-		for( size_t i = 0; i< contours.size(); i++ )
-		{
-			double a = contourArea(contours[i]);
-			if (a > 400)
-			{
-				cv::fillConvexPoly(pCvImg->image, contours[i], 0);
-			}
-			std::cout << "contour " << i << " size: " << a << std::endl;
-		}
-		std::cout << std::endl;
+		cv::warpPerspective(oImg, mRectifiedImg, mPerspectiveTransform, oImg.size());
+		oImg = mRectifiedImg;
+	}
 
-*/
+	void ImageCallback(const sensor_msgs::ImageConstPtr& msg)
+	{
+		cv_bridge::CvImagePtr pCvImg;
+		try
+		{
+		  pCvImg = cv_bridge::toCvCopy(msg, sensor_msgs::image_encodings::BGR8);
+		}
+		catch (cv_bridge::Exception& e)
+		{
+		  ROS_ERROR("cv_bridge exception: %s", e.what());
+		  return;
+		}
+
+		cv::Mat oImg;
+		pCvImg->image.copyTo(oImg);
+
+		WarpPerspective(oImg);
+		FilterGreenLines(oImg);
+		ApplyThresholding(oImg);
+
+
+		if (m_bWithUndistortion)
+		{
+			cv::Mat oUndistortedImg;
+			cv::undistort(oImg, oUndistortedImg, m_oCameraMatrix, m_oDistCoeffs);
+			oImg = oUndistortedImg;
+		}
+
 		sensor_msgs::ImagePtr oPubMsg = cv_bridge::CvImage(std_msgs::Header(),
-				sensor_msgs::image_encodings::MONO8, pCvImg->image).toImageMsg();
+				sensor_msgs::image_encodings::MONO8, oImg).toImageMsg();
 		// Output modified video stream
 		m_oImagePub.publish(oPubMsg);
 
-		cv::imshow("window", pCvImg->image);
+		cv::imshow("window", oImg);
 		cv::waitKey(1);
 	}
 };
@@ -188,8 +334,8 @@ int main(int argc, char** argv)
 
 	ros::init(argc, argv, "forward_undistortion");
 
-    if (!ReadConfigFile(sConfigFile, cameraMatrix, distCoeffs))
-    	return -1;
+//    if (!ReadConfigFile(sConfigFile, cameraMatrix, distCoeffs))
+//    	return -1;
     CForwardCameraUndistortion oCalibrate(sTopicIn, sTopicOut);
 	//CForwardCameraUndistortion oCalibrate(sTopicIn, sTopicOut, cameraMatrix, distCoeffs);
     ros::spin();
