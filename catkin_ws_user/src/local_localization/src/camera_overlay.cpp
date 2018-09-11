@@ -83,8 +83,8 @@ public:
 		std::string sImagePath = ros::package::getPath(PACKAGE_NAME) + "/images/";
 		std::string sMapPath = ros::package::getPath(PACKAGE_NAME) + "/mapTables/";
 
-//		m_oMapImg = imread(sImagePath + "fu_robotics_lab_map.jpg", cv::IMREAD_GRAYSCALE);
-		m_oMapImg = imread(sImagePath + "Lab_map_600x400.png", cv::IMREAD_GRAYSCALE);
+		m_oMapImg = imread(sImagePath + "fu_robotics_lab_map.jpg", cv::IMREAD_GRAYSCALE);
+//		m_oMapImg = imread(sImagePath + "Lab_map_600x400.png", cv::IMREAD_GRAYSCALE);
 
 		cv::FileStorage fs(sMapPath + "forcemap.xml", cv::FileStorage::READ);
 		fs["ForceMap"] >> m_oForceMap;
@@ -114,7 +114,7 @@ public:
 		// Subscribe to input video feed
 //		m_oImageSub = m_oImgTransport.subscribe("/forward_rectified", 1,
 //		  &CCameraOverlay::ImageCallback, this, image_transport::TransportHints("compressed"));
-		m_oImageSub = m_oImgTransport.subscribe("/usb_cam/image_undistorted", 1,
+		m_oImageSub = m_oImgTransport.subscribe("/forward_rectified", 1,
 		  &CCameraOverlay::ImageCallback, this, image_transport::TransportHints("compressed"));
 		m_oOdomSub = m_oNodeHandle.subscribe("/odom", 1, &CCameraOverlay::OdomCallback, this);
 	}

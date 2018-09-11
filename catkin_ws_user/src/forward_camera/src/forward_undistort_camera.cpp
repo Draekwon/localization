@@ -50,6 +50,9 @@ public:
 	{
 		cv::namedWindow("window", cv::WINDOW_NORMAL);
 		cv::namedWindow("masked", cv::WINDOW_NORMAL);
+		cv::namedWindow("adaptive", cv::WINDOW_NORMAL);
+		cv::namedWindow("hsv", cv::WINDOW_NORMAL);
+		cv::namedWindow("bitwise", cv::WINDOW_NORMAL);
 
 		m_oImagePub = m_oImgTransport.advertise(sOutputTopic, 1);
 		m_oImageSub = m_oImgTransport.subscribe(sInputTopic, 1,
@@ -66,10 +69,29 @@ private:
 
 		/// green h: 60°-180° => 42.5 - 127.5
 
+//		cv::Mat channels[3], oAdaptiveImg;
+//		cv::split(oHsvImg, channels);
+//		cv::adaptiveThreshold(channels[1], oAdaptiveImg, 255, cv::ADAPTIVE_THRESH_MEAN_C, cv::THRESH_BINARY_INV, 5, 9);
+//		cv::dilate(oAdaptiveImg, oAdaptiveImg, cv::Mat(), cv::Point(-1,-1), 1);
+
 		cv::Mat oRangedImg(oImg.size(), CV_8UC1);
-		cv::inRange(oHsvImg, cv::Scalar(0, 75, 100), cv::Scalar(255, 255, 200), oRangedImg);
+		cv::inRange(oHsvImg, cv::Scalar(0, 100, 75), cv::Scalar(255, 255, 180), oRangedImg);
 		cv::erode(oRangedImg, oRangedImg, cv::Mat(), cv::Point(-1, -1), 2);
 		cv::dilate(oRangedImg, oRangedImg, cv::Mat(), cv::Point(-1,-1), 2);
+
+
+//		cv::imshow("H", channels[0]);
+//		cv::imshow("S", channels[1]);
+//		cv::imshow("V", channels[2]);
+
+
+//		cv::Mat oBitwiseImg;
+//		cv::bitwise_and(oAdaptiveImg, oRangedImg, oBitwiseImg);
+//
+//
+//		cv::imshow("adaptive", oAdaptiveImg);
+//		cv::imshow("hsv", oRangedImg);
+//		cv::imshow("bitwise", oBitwiseImg);
 
 
 		// lines to top
