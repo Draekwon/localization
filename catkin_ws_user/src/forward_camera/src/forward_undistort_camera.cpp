@@ -18,7 +18,10 @@
 #include "sensor_msgs/image_encodings.h"
 
 
-const std::string PACKAGE_NAME = "forward_camera";
+#include "../../local_localization/src/camera_overlay.cpp"
+
+
+const std::string PACKAGE_NAME_FORWARD_CAMERA = "forward_camera";
 
 
 class CForwardCameraUndistortion
@@ -29,6 +32,9 @@ class CForwardCameraUndistortion
 	image_transport::Subscriber m_oImageSub;
 	image_transport::Publisher m_oImagePub;
 
+	CCameraOverlay* m_pMatrixLocalization = nullptr;
+
+	bool m_bWithPublisher		= true;
 	bool m_bWithUndistortion	= true;
 
 	const cv::Mat m_oCameraMatrix, m_oDistCoeffs;
@@ -48,15 +54,23 @@ public:
 	CForwardCameraUndistortion(const std::string& sInputTopic, const std::string& sOutputTopic)
 	: m_oImgTransport(m_oNodeHandle), m_bWithUndistortion(false)
 	{
-		cv::namedWindow("window", cv::WINDOW_NORMAL);
-		cv::namedWindow("masked", cv::WINDOW_NORMAL);
-//		cv::namedWindow("adaptive", cv::WINDOW_NORMAL);
-//		cv::namedWindow("hsv", cv::WINDOW_NORMAL);
-//		cv::namedWindow("bitwise", cv::WINDOW_NORMAL);
-
 		m_oImagePub = m_oImgTransport.advertise(sOutputTopic, 1);
 		m_oImageSub = m_oImgTransport.subscribe(sInputTopic, 1,
 				  &CForwardCameraUndistortion::ImageCallback, this, image_transport::TransportHints("compressed"));
+	}
+
+	CForwardCameraUndistortion(const std::string& sInputTopic, CCameraOverlay* pMatrixLocalization)
+	: m_oImgTransport(m_oNodeHandle), m_bWithUndistortion(false),
+	  m_bWithPublisher(false), m_pMatrixLocalization(pMatrixLocalization)
+	{
+		m_oImageSub = m_oImgTransport.subscribe(sInputTopic, 1,
+				  &CForwardCameraUndistortion::ImageCallback, this, image_transport::TransportHints("compressed"));
+	}
+
+	~CForwardCameraUndistortion()
+	{
+		if (m_pMatrixLocalization)
+			delete m_pMatrixLocalization;
 	}
 
 private:
@@ -285,13 +299,17 @@ private:
 			oImg = oUndistortedImg;
 		}
 
-		sensor_msgs::ImagePtr oPubMsg = cv_bridge::CvImage(std_msgs::Header(),
-				sensor_msgs::image_encodings::MONO8, oImg).toImageMsg();
-		// Output modified video stream
-		m_oImagePub.publish(oPubMsg);
-
-		cv::imshow("window", oImg);
-		cv::waitKey(1);
+		if (m_bWithPublisher)
+		{
+			sensor_msgs::ImagePtr oPubMsg = cv_bridge::CvImage(std_msgs::Header(),
+					sensor_msgs::image_encodings::MONO8, oImg).toImageMsg();
+			// Output modified video stream
+			m_oImagePub.publish(oPubMsg);
+		}
+		else if (m_pMatrixLocalization)
+		{
+			m_pMatrixLocalization->ProcessNewImg(oImg);
+		}
 	}
 };
 
@@ -340,7 +358,7 @@ int main(int argc, char** argv)
         return 0;
     }
 
-    const std::string sConfigFile = ros::package::getPath(PACKAGE_NAME) + "/config/" + parser.get<std::string>("i");
+    const std::string sConfigFile = ros::package::getPath(PACKAGE_NAME_FORWARD_CAMERA) + "/config/" + parser.get<std::string>("i");
     const std::string sTopicIn = parser.get<std::string>("ti");
     const std::string sTopicOut = parser.get<std::string>("to");
 
@@ -356,8 +374,11 @@ int main(int argc, char** argv)
 
 //    if (!ReadConfigFile(sConfigFile, cameraMatrix, distCoeffs))
 //    	return -1;
-    CForwardCameraUndistortion oCalibrate(sTopicIn, sTopicOut);
+
+	CCameraOverlay* oImgTest = new CCameraOverlay(1.0 / 3.0);
+    CForwardCameraUndistortion oCalibrate(sTopicIn, oImgTest);
 	//CForwardCameraUndistortion oCalibrate(sTopicIn, sTopicOut, cameraMatrix, distCoeffs);
+
     ros::spin();
 
     return 0;

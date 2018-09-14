@@ -33,7 +33,6 @@
 
 #include "utility.h"
 
-
 /**
  * This class subscribes to the /odom and /usb_cam/image_undistorted topics
  * to apply the MATRIX-algorithm and publish a new /MATRIX_Location
@@ -75,9 +74,10 @@ public:
 	/**
 	 * subscribes to /odom and /usb_cam/image_undistorted and publishes /MATRIX_Location (odometry) and /camera_overlay (image)
 	 * @param fScaleFactor		scales the camera image so that 1px = 1cm
-	 * @param bPublishOverlay	sets publishing of overlay to true or false
+	 * @param sImageTopic		sets the image topic this class should subscribe to. If empty, this class does not subscribe to an image topic.
+	 * @param bPublishOverlay	sets publishing of overlay to true or false.
 	 */
-	CCameraOverlay(double fScaleFactor, bool bPublishOverlay = true)
+	CCameraOverlay(double fScaleFactor, std::string sImageTopic = "", bool bPublishOverlay = false)
 	: m_oImgTransport(m_oNodeHandle), m_fScaleFactor(fScaleFactor), m_bPublishOverlay(bPublishOverlay)
 	{
 		std::string sImagePath = ros::package::getPath(PACKAGE_NAME) + "/images/";
@@ -114,8 +114,11 @@ public:
 		// Subscribe to input video feed
 //		m_oImageSub = m_oImgTransport.subscribe("/forward_rectified", 1,
 //		  &CCameraOverlay::ImageCallback, this, image_transport::TransportHints("compressed"));
-		m_oImageSub = m_oImgTransport.subscribe("/forward_rectified", 1,
-		  &CCameraOverlay::ImageCallback, this, image_transport::TransportHints("compressed"));
+		if (!sImageTopic.empty())
+		{
+			m_oImageSub = m_oImgTransport.subscribe(sImageTopic, 1,
+			  &CCameraOverlay::ImageCallback, this, image_transport::TransportHints("compressed"));
+		}
 		m_oOdomSub = m_oNodeHandle.subscribe("/odom", 1, &CCameraOverlay::OdomCallback, this);
 	}
 
@@ -123,6 +126,8 @@ public:
 	{
 	}
 
+
+protected:
 
 	/**
 	 * this callback saves the current odometry in a class variable
@@ -300,15 +305,13 @@ public:
 	bool m_bIsFirstTime = true;
 
 	/**
-	 * callback for /usb_cam/image_undistorted.
+	 * callback for /image_undistorted.
 	 * This is the main part of this class.
 	 * Here, the camera image is used to improve the position the odometry returns.
 	 * @param msg 	The image-message containing the camera-image.
 	 */
 	void ImageCallback(const sensor_msgs::ImageConstPtr& msg)
 	{
-		clock_t t1 = clock();
-
 		cv_bridge::CvImagePtr pCvImg;
 
 		try
@@ -321,7 +324,15 @@ public:
 		  return;
 		}
 
-		cv::Mat oPreparedCameraImg = PrepareCameraImage(pCvImg->image);
+		ProcessImg(pCvImg->image);
+	}
+
+
+	void ProcessImg(cv::Mat oImg)
+	{
+		clock_t t1 = clock();
+
+		cv::Mat oPreparedCameraImg = PrepareCameraImage(oImg);
 
 		// this should basically be the odometry of the car
 		double fOdomYaw = tf::getYaw(m_oOdomPose.orientation);
@@ -415,14 +426,24 @@ public:
 		clock_t t2 = clock();
 		std::cout << "ts: " << (float(t2 - t1)/CLOCKS_PER_SEC) << std::endl;
 	}
+
+
+public:
+
+	void ProcessNewImg(cv::Mat oNewImg)
+	{
+		ProcessImg(oNewImg);
+	}
+
 };
 
 
-int main(int argc, char **argv)
-{
-	ros::init(argc, argv, "camera_overlay");
-//	CCameraOverlay oImgTest(67.0 / 144.0);
-	CCameraOverlay oImgTest(1.0 / 3.0);
-	ros::spin();
-	return 0;
-}
+//int main(int argc, char **argv)
+//{
+//	ros::init(argc, argv, "camera_overlay");
+////	CCameraOverlay oImgTest(67.0 / 144.0, /usb_cam/image_rectified, true);
+//
+//
+//	ros::spin();
+//	return 0;
+//}
