@@ -50,9 +50,9 @@ public:
 	{
 		cv::namedWindow("window", cv::WINDOW_NORMAL);
 		cv::namedWindow("masked", cv::WINDOW_NORMAL);
-		cv::namedWindow("adaptive", cv::WINDOW_NORMAL);
-		cv::namedWindow("hsv", cv::WINDOW_NORMAL);
-		cv::namedWindow("bitwise", cv::WINDOW_NORMAL);
+//		cv::namedWindow("adaptive", cv::WINDOW_NORMAL);
+//		cv::namedWindow("hsv", cv::WINDOW_NORMAL);
+//		cv::namedWindow("bitwise", cv::WINDOW_NORMAL);
 
 		m_oImagePub = m_oImgTransport.advertise(sOutputTopic, 1);
 		m_oImageSub = m_oImgTransport.subscribe(sInputTopic, 1,
@@ -229,12 +229,10 @@ private:
 //		cv::split(oHlsImg, channels);
 //		cv::adaptiveThreshold(channels[1], oImg, 255, cv::ADAPTIVE_THRESH_MEAN_C, cv::THRESH_BINARY_INV, 3, 8);
 
-		cv::waitKey(1);
-		cv::inRange(oHlsImg, cv::Scalar(0, 200, 0), cv::Scalar(255, 255, 255), oImg);
+		cv::inRange(oHlsImg, cv::Scalar(0, 175, 0), cv::Scalar(255, 255, 255), oImg);
+
 		cv::dilate(oImg, oImg, cv::Mat(), cv::Point(-1, -1), 2);
 		cv::erode(oImg, oImg, cv::Mat(), cv::Point(-1,-1), 1);
-//		cv::dilate(oImg, oImg, cv::Mat(), cv::Point(-1, -1), 1);
-//		oImg = oRangedImg;
 	}
 
 	void WarpPerspective(cv::Mat& oImg)

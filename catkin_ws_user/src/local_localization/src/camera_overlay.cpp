@@ -63,7 +63,7 @@ class CCameraOverlay
 	bool 	m_bPublishOverlay;
 	double	m_fScaleFactor;
 
-	bool m_bIsFrontFacingCamera = false;
+	bool m_bIsFrontFacingCamera = true;
 
 	//! 50 cm distance between the car and the first point it can see in the forward camera perspective
 	const int FOV_DISTANCE_TO_CAR = 50;
@@ -179,18 +179,20 @@ public:
 	{
 		// I have no idea why the following should be necessary...
 		dYaw = dYaw * 180 / M_PI;
-//		dYaw = dYaw > 179 ? dYaw - 360 : dYaw;
 		// what this does is, it converts from radians to degrees and then switches front and back.
 		// front and back switch is simple: camera image is reversed.
 		// but radians -> degrees? no idea.
 
 		if (m_bIsFrontFacingCamera)
 		{
+			dYaw -= 90;
+			dYaw = dYaw < -180 ? dYaw + 360 : dYaw;
+
 			// turn the image points around the car
 			cv::Point2f oRotationCenter(nCamWidth / 2.0, nCamHeight + FOV_DISTANCE_TO_CAR);
 			cv::Mat oRotMat = getRotationMatrix2D(oRotationCenter, dYaw, 1.0);
 			// add a translation to the matrix
-			oRotMat.at<double>(0,2) += nMapWidth / 2 + oCenter.x - nCamWidth/2.0;
+			oRotMat.at<double>(0,2) += nMapWidth / 2 + oCenter.x - nCamWidth / 2.0;
 			oRotMat.at<double>(1,2) += nMapHeight / 2 + oCenter.y - nCamHeight - FOV_DISTANCE_TO_CAR;
 
 			return oRotMat;
@@ -264,9 +266,13 @@ public:
 	{
 		// maybe erode and dilute before scaling the img?
 
-		cv::Mat oScaledImage;
-		cv::resize(oCameraImg, oScaledImage, cv::Size(), m_fScaleFactor, m_fScaleFactor);
-		oCameraImg = oScaledImage;
+		cv::Mat oTmpImg;
+		cv::resize(oCameraImg, oTmpImg, cv::Size(), m_fScaleFactor, m_fScaleFactor);
+		oCameraImg = oTmpImg;
+
+		// flip by y axis
+		cv::flip(oCameraImg, oTmpImg, 1);
+		oCameraImg = oTmpImg;
 
 		// hide the car
 		if (!m_bIsFrontFacingCamera)
@@ -277,12 +283,9 @@ public:
 			cv::Mat emptyMat = cv::Mat::zeros(CAR_SIZE.height, CAR_SIZE.width, CV_8UC3);
 			emptyMat.copyTo(oCameraImg(oModelCarRect));
 
-
-			// flip by y axis
-			cv::Mat oFlippedImg;
-			cv::flip(oCameraImg, oFlippedImg, 1);
 			// rotate by 90 degrees
-			cv::rotate(oFlippedImg, oCameraImg, cv::ROTATE_90_COUNTERCLOCKWISE);
+			cv::rotate(oCameraImg, oTmpImg, cv::ROTATE_90_COUNTERCLOCKWISE);
+			oCameraImg = oTmpImg;
 		}
 
 		cv::Mat oYuvImg;
@@ -418,8 +421,8 @@ public:
 int main(int argc, char **argv)
 {
 	ros::init(argc, argv, "camera_overlay");
-	CCameraOverlay oImgTest(67.0 / 144.0);
-//	CCameraOverlay oImgTest(1.0 / 3.0);
+//	CCameraOverlay oImgTest(67.0 / 144.0);
+	CCameraOverlay oImgTest(1.0 / 3.0);
 	ros::spin();
 	return 0;
 }
