@@ -31,6 +31,7 @@
 #include "opencv2/highgui/highgui.hpp"
 #include "opencv2/xfeatures2d.hpp"
 
+#include "global_localization.cpp"
 #include "utility.h"
 
 /**
@@ -64,8 +65,8 @@ class CCameraOverlay
 
 	bool m_bIsFrontFacingCamera = true;
 
-	//! 50 cm distance between the car and the first point it can see in the forward camera perspective
-	const int FOV_DISTANCE_TO_CAR = 50;
+	bool m_bIsFirstTime = true;
+	bool m_bIsLocalizing = false;
 
 	std::string m_sWindowName = "CamOverlay";
 
@@ -147,24 +148,66 @@ protected:
 	void PublishMapOverlay(cv::Mat oContourImg, cv::Mat oRotMat, cv::Point oCenter)
 	{
 
-		cv::Mat oMapImg = cv::Mat::zeros(m_oMapImg.size() * 2, CV_8UC1);
+		cv::Mat oMapImg = cv::Mat::zeros(m_oMapImg.size() * 2, CV_8UC3);
 		cv::Rect2f oBoundingBox(cv::Point2f(0,0), oMapImg.size());
 
-	    cv::Mat oRotatedImage;
+	    cv::Mat oRotatedImage, oBgrRotated;
 	    warpAffine(oContourImg, oRotatedImage, oRotMat, oBoundingBox.size());
+
+	    cv::Mat1b ch1 = cv::Mat1b::zeros(oRotatedImage.size());
+	    cv::Mat1b ch2 = oRotatedImage;
+	    cv::Mat1b ch3 = oRotatedImage;
+	    cv::Mat channels[3] = {ch1, ch2, ch3};
+	    cv::merge(channels, 3, oBgrRotated);
 
 //		// publish the overlay to double check rotation and stuff
 		cv::Rect oRegionOfInterest = cv::Rect(oBoundingBox);
 
-		m_oMapImg.copyTo(oMapImg(cv::Rect(oMapImg.size() / 4, m_oMapImg.size())));
+		cv::Mat oBgrMap;
+		cv::cvtColor(m_oMapImg, oBgrMap, cv::COLOR_GRAY2BGR);
+		oBgrMap.copyTo(oMapImg(cv::Rect(oMapImg.size() / 4, m_oMapImg.size())));
 		oCenter.x += oMapImg.cols / 4;
 		oCenter.y += oMapImg.rows / 4;
+
 		cv::Mat oDestinationRoi = oMapImg(oRegionOfInterest);
-		oRotatedImage.copyTo(oDestinationRoi, oRotatedImage);
-		cv::circle(oMapImg, oCenter, 10, 255, -1);
+		oBgrRotated.copyTo(oDestinationRoi, oRotatedImage);
+
+
+//		cv::Point2d oForceVectorSum;
+//		int counter = 0;
+//
+//		for (int x = 0; x < oContourImg.cols; x++)
+//		{
+//			for (int y = 0; y < oContourImg.rows; y++)
+//			{
+//				if (oContourImg.at<int>(y, x) > 128)
+//				{
+//					cv::Mat1d oValueMat(3, 1);
+//					oValueMat.at<double>(0) = x;
+//					oValueMat.at<double>(1) = y;
+//					oValueMat.at<double>(2) = 1;
+//					oValueMat = oRotMat * oValueMat;
+//					cv::Point oVectorFieldCoordinate = cv::Point2d(oValueMat) / VECTOR_FIELD_DISTANCE;
+//					cv::Point oMapCoordinate = cv::Point(oValueMat);
+//					cv::Rect rect(cv::Point(), m_oForceMap.size());
+//					if (!rect.contains(oVectorFieldCoordinate))
+//					{
+//						continue;
+//					}
+//					cv::Point2d oForceVector = m_oForceMap.at<cv::Point2d>(oVectorFieldCoordinate.y, oVectorFieldCoordinate.x) * 100;
+//					oForceVectorSum += oForceVector;
+//					oMapImg.at<cv::Vec3b>(oMapCoordinate.y, oMapCoordinate.x) = cv::Vec3b(0,255,255);
+////					arrowedLine(oMapImg, oMapCoordinate, oMapCoordinate + cv::Point(oForceVector), cv::Scalar(255,255,0), 1, cv::LINE_AA);
+//					counter++;
+//				}
+//			}
+//		}
+		cv::circle(oMapImg, oCenter, 8, cv::Scalar(0, 255, 0), -1);
+//		arrowedLine(oMapImg, oCenter, oCenter + cv::Point(oForceVectorSum / counter * 10), cv::Scalar(0,0,255), 2, cv::LINE_AA);
+
 
 		sensor_msgs::ImagePtr oPubMsg = cv_bridge::CvImage(std_msgs::Header(),
-				sensor_msgs::image_encodings::MONO8, oMapImg).toImageMsg();
+				sensor_msgs::image_encodings::BGR8, oMapImg).toImageMsg();
 		// Output modified video stream
 		m_oImagePub.publish(oPubMsg);
 	}
@@ -180,7 +223,7 @@ protected:
 	 * @param fYaw			current assumed rotation of the car in radians
 	 * @return				the transformation matrix
 	 */
-	cv::Mat GetTransformationMatrix(int nCamWidth, int nCamHeight, int nMapWidth, int nMapHeight, cv::Point oCenter, double dYaw)
+	cv::Mat GetTransformationMatrix(int nCamWidth, int nCamHeight, int nMapWidth, int nMapHeight, cv::Point2d oCenter, double dYaw)
 	{
 		// I have no idea why the following should be necessary...
 		dYaw = dYaw * 180 / M_PI;
@@ -224,7 +267,7 @@ protected:
 	 * @param oCenter	the assumed position of the  car
 	 * @return			the averaged force vector
 	 */
-	cv::Point2d GetForceVector(cv::Mat oTransMat, cv::Mat oImg, double &oTorque, cv::Point oCenter)
+	cv::Point2d GetForceVector(cv::Mat oTransMat, cv::Mat oImg, double &oTorque, cv::Point2d oCenter)
 	{
 		cv::Point2d oForceVector(0,0);
 		int counter = 0;
@@ -248,7 +291,7 @@ protected:
 						continue;
 					}
 
-					oForceVector += m_oForceMap.at<cv::Point2d>(oVectorFieldCoordinate.y, oVectorFieldCoordinate.x);
+					oForceVector += m_oForceMap.at<cv::Point2d>(oVectorFieldCoordinate.y, oVectorFieldCoordinate.x) * 100;
 					cv::Point2d distanceVec = cv::Point2d(oValueMat.at<double>(0) - oCenter.x, oValueMat.at<double>(1) - oCenter.y);
 					oTorque += distanceVec.cross(m_oForceMap.at<cv::Point2d>(oVectorFieldCoordinate.y, oVectorFieldCoordinate.x));
 
@@ -293,16 +336,14 @@ protected:
 			oCameraImg = oTmpImg;
 		}
 
-		cv::Mat oYuvImg;
-		cv::cvtColor(oCameraImg, oYuvImg, CV_BGR2YUV);
-		cv::Mat oRangedImg;
-		cv::inRange(oYuvImg, cv::Scalar(120, 0, 0), cv::Scalar(255, 255, 255), oRangedImg);
+//		cv::Mat oYuvImg;
+//		cv::cvtColor(oCameraImg, oYuvImg, CV_BGR2YUV);
+//		cv::Mat oRangedImg;
+//		cv::inRange(oYuvImg, cv::Scalar(120, 0, 0), cv::Scalar(255, 255, 255), oRangedImg);
 
-		return oRangedImg;
+		return oCameraImg;
 	}
 
-
-	bool m_bIsFirstTime = true;
 
 	/**
 	 * callback for /image_undistorted.
@@ -316,7 +357,7 @@ protected:
 
 		try
 		{
-		  pCvImg = cv_bridge::toCvCopy(msg, sensor_msgs::image_encodings::BGR8);
+		  pCvImg = cv_bridge::toCvCopy(msg, sensor_msgs::image_encodings::MONO8);
 		}
 		catch (cv_bridge::Exception& e)
 		{
@@ -372,7 +413,6 @@ protected:
 
 			dAngleCorrection *= 0.1;
 
-			std::cout << "dAngleCorrection: " << dAngleCorrection << std::endl;
 
 			// force vectors are scaled, so that the longest one is 1cm (0.01m)
 			// scale them
@@ -381,14 +421,30 @@ protected:
 			oForceVector *= GetVectorLength(oOdomPosePosition - oOldOdomPosePosition) * 0.1;
 			//oForceVector *= 0.01; // 1cm
 
-			if (m_bIsFirstTime)
+			if (m_bIsFirstTime && !m_bIsLocalizing)
 			{
+				m_bIsLocalizing = true;
+
+				cv::Point2d oFirstPosition;
+				double dFirstAngle;
+				GetGlobalPositionAndAngle(oFirstPosition, dFirstAngle, oPreparedCameraImg);
+				oPosition.x = oFirstPosition.x;
+				oPosition.y = oFirstPosition.y;
+				fDifferentialYaw = dFirstAngle;
+
 				oForceVector = cv::Point2d(0,0);
 				dAngleCorrection = 0;
 				m_bIsFirstTime = false;
+				m_bIsLocalizing = false;
 
 			}
+			else if (m_bIsFirstTime)
+			{
+				// dont do shit
+				return;
+			}
 
+			std::cout << "dAngleCorrection: " << dAngleCorrection << std::endl;
 			std::cout << "forcevector length " << GetVectorLength(oForceVector) << std::endl;
 			// add the force vector to the position
 			oPosition.x += std::isinf(oForceVector.x) || std::isnan(oForceVector.x) ? 0 : oForceVector.x;

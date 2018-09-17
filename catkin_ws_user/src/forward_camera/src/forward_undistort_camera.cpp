@@ -162,7 +162,7 @@ private:
 			}
 		}
 
-		cv::imshow("masked", oImg);
+//		cv::imshow("masked", oImg);
 	}
 
 
@@ -375,7 +375,7 @@ int main(int argc, char** argv)
 //    if (!ReadConfigFile(sConfigFile, cameraMatrix, distCoeffs))
 //    	return -1;
 
-	CCameraOverlay* oImgTest = new CCameraOverlay(1.0 / 3.0);
+	CCameraOverlay* oImgTest = new CCameraOverlay(1.0 / 3.0, "", true);
     CForwardCameraUndistortion oCalibrate(sTopicIn, oImgTest);
 	//CForwardCameraUndistortion oCalibrate(sTopicIn, sTopicOut, cameraMatrix, distCoeffs);
 
