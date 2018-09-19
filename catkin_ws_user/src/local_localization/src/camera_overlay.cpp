@@ -150,15 +150,6 @@ protected:
 		cv::Mat oMapImg = cv::Mat::zeros(m_oMapImg.size() * 2, CV_8UC3);
 		cv::Rect2f oBoundingBox(cv::Point2f(0,0), m_oMapImg.size() * 2);
 
-		cv::Mat oTempContourImg = cv::Mat::zeros(m_oMapImg.size() * 2, CV_8UC1);
-		oContourImg.copyTo(oTempContourImg(cv::Rect(cv::Point(), oContourImg.size())));
-	    cv::Mat oRotatedImage, oBgrRotated;
-	    // no scaling!
-	    cv::warpAffine(oTempContourImg, oRotatedImage, oRotMat, oTempContourImg.size(), cv::INTER_LINEAR);
-
-//		// publish the overlay to double check rotation and stuff
-		cv::Rect oRegionOfInterest = cv::Rect(oBoundingBox);
-
 		cv::Mat oBgrMap;
 		cv::cvtColor(m_oMapImg, oBgrMap, cv::COLOR_GRAY2BGR);
 		oBgrMap.copyTo(oMapImg(cv::Rect(oMapImg.size() / 4, m_oMapImg.size())));
@@ -169,13 +160,19 @@ protected:
 		cv::Point2d oForceVectorSum;
 		int counter = 0;
 
-		for (int x = 0; x < oRotatedImage.cols; x++)
+		for (int x = 0; x < oContourImg.cols; x++)
 		{
-			for (int y = 0; y < oRotatedImage.rows; y++)
+			for (int y = 0; y < oContourImg.rows; y++)
 			{
-				if (oRotatedImage.at<uchar>(y, x) > 128)
+				if (oContourImg.at<uchar>(y, x) > 128)
 				{
-					cv::Point oVectorFieldCoordinate = cv::Point(x, y) / VECTOR_FIELD_DISTANCE;
+					cv::Mat1d oValueMat(3, 1);
+					oValueMat.at<double>(0) = x;
+					oValueMat.at<double>(1) = y;
+					oValueMat.at<double>(2) = 1;
+					oValueMat = oRotMat * oValueMat;
+					cv::Point oVectorFieldCoordinate = cv::Point(oValueMat) / VECTOR_FIELD_DISTANCE;
+					cv::Point oMapCoordinate = cv::Point(oValueMat);
 					cv::Rect rect(cv::Point(), m_oForceMap.size());
 					if (!rect.contains(oVectorFieldCoordinate))
 					{
@@ -183,9 +180,8 @@ protected:
 						continue;
 					}
 					cv::Point2d oForceVector = m_oForceMap.at<cv::Point2d>(oVectorFieldCoordinate.y, oVectorFieldCoordinate.x) * 100;
-					cv::Point oMapCoordinate(x,y);
 					oForceVectorSum += oForceVector;
-					oMapImg.at<cv::Vec3b>(y, x) = cv::Vec3b(0,255,255);
+					oMapImg.at<cv::Vec3b>(oMapCoordinate.y, oMapCoordinate.x) = cv::Vec3b(0,255,255);
 					arrowedLine(oMapImg, oMapCoordinate, oMapCoordinate + cv::Point(oForceVector), cv::Scalar(255,255,0), 1, cv::LINE_AA);
 
 					counter++;
@@ -256,24 +252,26 @@ protected:
 	 * @param oCenter	the assumed position of the  car
 	 * @return			the averaged force vector
 	 */
-	cv::Point2d GetForceVector(cv::Mat oTransMat, cv::Mat oImg, double &oTorque, cv::Point2d oCenter)
+	cv::Point2d GetForceVector(const cv::Mat& oTransMat, const cv::Mat& oImg, double &oTorque, cv::Point2d oCenter)
 	{
 		cv::Point2d oForceVector(0,0);
 		int counter = 0;
 
 		cv::Rect2f oBoundingBox(cv::Point2f(0,0), m_oMapImg.size() * 2);
-	    cv::Mat oRotatedImage;
-	    warpAffine(oImg, oRotatedImage, oTransMat, oBoundingBox.size());
 
-		for (int x = 0; x < oRotatedImage.cols; x++)
+		for (int x = 0; x < oImg.cols; x++)
 		{
-			for (int y = 0; y < oRotatedImage.rows; y++)
+			for (int y = 0; y < oImg.rows; y++)
 			{
 				// the type uchar is REALLY REALLY important
-				if (oRotatedImage.at<uchar>(y, x) > 128)
+				if (oImg.at<uchar>(y, x) > 128)
 				{
-					cv::Point oVectorFieldCoordinate = cv::Point(round((double)x / VECTOR_FIELD_DISTANCE), round((double)y / VECTOR_FIELD_DISTANCE));
-
+					cv::Mat1d oValueMat(3, 1);
+					oValueMat.at<double>(0) = x;
+					oValueMat.at<double>(1) = y;
+					oValueMat.at<double>(2) = 1;
+					oValueMat = oTransMat * oValueMat;
+					cv::Point oVectorFieldCoordinate = cv::Point(oValueMat) / VECTOR_FIELD_DISTANCE;
 					cv::Rect rect(cv::Point(), m_oForceMap.size());
 					if (!rect.contains(oVectorFieldCoordinate))
 					{
@@ -368,104 +366,132 @@ protected:
 		double fOdomYaw = tf::getYaw(m_oOdomPose.orientation);
 		double fOldOdomYaw = tf::getYaw(m_oOldOdomPose.orientation);
 		double fYaw = tf::getYaw(m_oCurrentPose.orientation);
-		double fDifferentialYaw = fYaw + fOdomYaw - fOldOdomYaw;
+
 
 		// ros does not like to add positions, so convert them to Opencv points...
 		cv::Point3d oOdomPosePosition(m_oOdomPose.position.x, m_oOdomPose.position.y, m_oOdomPose.position.z);
 		cv::Point3d oOldOdomPosePosition(m_oOldOdomPose.position.x, m_oOldOdomPose.position.y, m_oOldOdomPose.position.z);
 		cv::Point3d oCurrentPosePosition(m_oCurrentPose.position.x, m_oCurrentPose.position.y, m_oCurrentPose.position.z);
+
+		double fDifferentialYaw = fYaw + fOdomYaw - fOldOdomYaw;
 		cv::Point3d oPosition = oCurrentPosePosition + oOdomPosePosition - oOldOdomPosePosition;
-		try {
-			double oTorque = 0;
-			//! oCenter is the position of the car in image coordinates
-			cv::Point oCenter = cv::Point(oPosition.x * M_TO_CM, oPosition.y * M_TO_CM);
 
-			cv::Mat oTransformationMat = GetTransformationMatrix(oPreparedCameraImg.cols, oPreparedCameraImg.rows,
-					m_oMapImg.cols, m_oMapImg.rows, oCenter, -fDifferentialYaw);
-			cv::Point2d oForceVector = GetForceVector(oTransformationMat, oPreparedCameraImg, oTorque, oCenter);
+		// this adds a normal deviation to the odometry like in the paper
+		// comment this out to save (a lot) of performance
+//		{
+//			cv::RNG rng(12354);
+//			cv::Mat3d oRandomPositions(1,10);
+//			cv::Vec3d deviation(abs(oOdomPosePosition.x - oOldOdomPosePosition.x), abs(oOdomPosePosition.y - oOldOdomPosePosition.y), abs(fOdomYaw - fOldOdomYaw));
+//			rng.fill(oRandomPositions, cv::RNG::NORMAL, cv::Vec3d(oPosition.x, oPosition.y, fDifferentialYaw), deviation);
+//			double dRating = -1;
+//			for (int nCol = 0; nCol < oRandomPositions.cols; nCol++)
+//			{
+//				cv::Vec3d oNormalPosition = oRandomPositions.at<cv::Vec3d>(0, nCol);
+//				cv::Point oNormalCenter = cv::Point(oNormalPosition[0] * M_TO_CM, oNormalPosition[1] * M_TO_CM);
+//				cv::Mat oNormalTransMat = GetTransformationMatrix(oPreparedCameraImg.cols, oPreparedCameraImg.rows,
+//						m_oMapImg.cols, m_oMapImg.rows, oNormalCenter, -oNormalPosition[2]);
+//				double dCurrentRating = GetMatchQuality(m_oForceMap, oNormalTransMat, oPreparedCameraImg, m_oMapImg.size());
+//
+//				if (dCurrentRating < dRating || dRating < 0)
+//				{
+//					dRating = dCurrentRating;
+//					oPosition.x = oNormalPosition[0];
+//					oPosition.y = oNormalPosition[1];
+//					// assuming z = 0
+//					fDifferentialYaw = oNormalPosition[2];
+//				}
+//			}
+//		}
 
+		double oTorque = 0;
+		//! oCenter is the position of the car in image coordinates
+		cv::Point oCenter = cv::Point(oPosition.x * M_TO_CM, oPosition.y * M_TO_CM);
 
-			// angle - value = turn left
-			// angle + value = turn right
-			double dAngleCorrection;
-			if (oTorque < 0)
-				// + 0.1 times the yaw difference between now and the last yaw
-				dAngleCorrection = (fOldOdomYaw - fOdomYaw);
-			else
-				// - 0.1 times the yaw difference between now and the last yaw
-				dAngleCorrection = (fOdomYaw - fOldOdomYaw);
-
-			if (dAngleCorrection >= M_PI)
-				dAngleCorrection -= 2 * M_PI;
-			if (dAngleCorrection < -M_PI)
-				dAngleCorrection += 2 * M_PI;
-
-			dAngleCorrection *= 0.1;
-
-
-			// force vectors are scaled, so that the longest one is 1cm (0.01m)
-			// scale them
-			oForceVector /= GetVectorLength(oForceVector);
-			// 10% of the odometry movement is error correction
-			oForceVector *= GetVectorLength(oOdomPosePosition - oOldOdomPosePosition) * 0.1;
-			//oForceVector *= 0.01; // 1cm
-
-			if (m_bIsFirstTime && !m_bIsLocalizing)
-			{
-				m_bIsLocalizing = true;
-
-				cv::Point2d oFirstPosition;
-				double dFirstAngle;
-				GetGlobalPositionAndAngle(oFirstPosition, dFirstAngle, oPreparedCameraImg);
-				oPosition.x = oFirstPosition.x;
-				oPosition.y = oFirstPosition.y;
-				fDifferentialYaw = dFirstAngle;
-
-				oForceVector = cv::Point2d(0,0);
-				dAngleCorrection = 0;
-				m_bIsFirstTime = false;
-				m_bIsLocalizing = false;
-
-			}
-			else if (m_bIsFirstTime)
-			{
-				// dont do shit
-				return;
-			}
-
-			std::cout << "dAngleCorrection: " << dAngleCorrection << std::endl;
-			std::cout << "forcevector length " << GetVectorLength(oForceVector) << std::endl;
-			// add the force vector to the position
-			oPosition.x += std::isinf(oForceVector.x) || std::isnan(oForceVector.x) ? 0 : oForceVector.x;
-			oPosition.y += std::isinf(oForceVector.y) || std::isnan(oForceVector.y) ? 0 : oForceVector.y;
-
-			fDifferentialYaw += dAngleCorrection;
+		cv::Mat oTransformationMat = GetTransformationMatrix(oPreparedCameraImg.cols, oPreparedCameraImg.rows,
+				m_oMapImg.cols, m_oMapImg.rows, oCenter, -fDifferentialYaw);
+		// force in meter
+		cv::Point2d oForceVector = GetForceVector(oTransformationMat, oPreparedCameraImg, oTorque, oCenter);
 
 
-			std::cout << "oTorque " << oTorque << ", fDifferentialYaw " << fDifferentialYaw << std::endl;
-			std::cout << "Position: " << oPosition << ", forcevector: " << oForceVector << std::endl;
+		// angle - value = turn left
+		// angle + value = turn right
+		double dAngleCorrection;
+		if (oTorque < 0)
+			// + 0.1 times the yaw difference between now and the last yaw
+			dAngleCorrection = (fOldOdomYaw - fOdomYaw) + (M_PI / 180);
+		else
+			// - 0.1 times the yaw difference between now and the last yaw
+			dAngleCorrection = (fOdomYaw - fOldOdomYaw) - (M_PI / 180);
 
-			if (m_bPublishOverlay)
-				PublishMapOverlay(oPreparedCameraImg, oTransformationMat, oCenter);
+		if (dAngleCorrection >= M_PI)
+			dAngleCorrection -= 2 * M_PI;
+		if (dAngleCorrection < -M_PI)
+			dAngleCorrection += 2 * M_PI;
 
-			nav_msgs::Odometry odom;
-			odom.header.stamp = ros::Time::now();
-			odom.header.frame_id = "odom";
+		dAngleCorrection *= 0.1;
 
-			geometry_msgs::Quaternion odom_quat = tf::createQuaternionMsgFromYaw(fDifferentialYaw);
-			m_oCurrentPose.orientation = odom_quat;
-			m_oCurrentPose.position.x = oPosition.x;
-			m_oCurrentPose.position.y = oPosition.y;
-			m_oCurrentPose.position.z = oPosition.z;
 
-			//set the position
-			odom.pose.pose = m_oCurrentPose;
+		// force vectors are scaled, so that the longest one is 1cm (0.01m)
+		// scale them
+		oForceVector /= GetVectorLength(oForceVector);
+		// 10% of the odometry movement is error correction
+		oForceVector *= GetVectorLength(oOdomPosePosition - oOldOdomPosePosition) * 0.1 + 0.01;
+		//oForceVector *= 0.01; // 1cm
 
-			//publish the message
-			m_oOdomPub.publish(odom);
-		}catch(std::exception&)
+		if (m_bIsFirstTime && !m_bIsLocalizing)
 		{
+			m_bIsLocalizing = true;
+
+			cv::Point2d oFirstPosition;
+			double dFirstAngle;
+			GetGlobalPositionAndAngle(oFirstPosition, dFirstAngle, oPreparedCameraImg);
+			oPosition.x = oFirstPosition.x;
+			oPosition.y = oFirstPosition.y;
+			fDifferentialYaw = dFirstAngle;
+
+			oForceVector = cv::Point2d(0,0);
+			dAngleCorrection = 0;
+			m_bIsFirstTime = false;
+			m_bIsLocalizing = false;
+
 		}
+		else if (m_bIsFirstTime)
+		{
+			// dont do shit
+			return;
+		}
+
+		std::cout << "dAngleCorrection: " << dAngleCorrection << std::endl;
+		std::cout << "forcevector length " << GetVectorLength(oForceVector) << std::endl;
+		// add the force vector to the position
+		oPosition.x += std::isinf(oForceVector.x) || std::isnan(oForceVector.x) ? 0 : oForceVector.x;
+		oPosition.y += std::isinf(oForceVector.y) || std::isnan(oForceVector.y) ? 0 : oForceVector.y;
+
+		fDifferentialYaw += dAngleCorrection;
+
+
+		std::cout << "oTorque " << oTorque << ", fDifferentialYaw " << fDifferentialYaw << std::endl;
+		std::cout << "Position: " << oPosition << ", forcevector: " << oForceVector << std::endl;
+
+		if (m_bPublishOverlay)
+			PublishMapOverlay(oPreparedCameraImg, oTransformationMat, oCenter);
+
+		nav_msgs::Odometry odom;
+		odom.header.stamp = ros::Time::now();
+		odom.header.frame_id = "odom";
+
+		geometry_msgs::Quaternion odom_quat = tf::createQuaternionMsgFromYaw(fDifferentialYaw);
+		m_oCurrentPose.orientation = odom_quat;
+		m_oCurrentPose.position.x = oPosition.x;
+		m_oCurrentPose.position.y = oPosition.y;
+		m_oCurrentPose.position.z = oPosition.z;
+
+		//set the position
+		odom.pose.pose = m_oCurrentPose;
+
+		//publish the message
+		m_oOdomPub.publish(odom);
+
 		m_oOldOdomPose = m_oOdomPose;
 
 		clock_t t2 = clock();

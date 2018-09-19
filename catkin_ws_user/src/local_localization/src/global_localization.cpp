@@ -44,6 +44,7 @@ cv::Mat GetTransformationMatrix(int nCamWidth, int nCamHeight, int nMapWidth, in
 	// what this does is, it converts from radians to degrees.
 	// why radians -> degrees? no idea.
 
+	//! for now we assume everything is always front facing
 //		if (m_bIsFrontFacingCamera)
 	{
 		dYaw -= 90;
@@ -72,34 +73,39 @@ cv::Mat GetTransformationMatrix(int nCamWidth, int nCamHeight, int nMapWidth, in
 
 
 /**
- * uses a transformation matrix to map image pixels to the force field and returns the average of the force vectors
- * @param oTransMat	transformation matrix
- * @param oImg		image
- * @param oTorque	the torque calculated by using the 2D-cross product. It will be saved in this var.
- * @param oCenter	the assumed position of the car in image coordinates
- * @return			the overall distance
+ * gets the match quality (the lengths of the force vectors added) for a position and rotation of the car.
+ * Position and rotation are contained in the transformation matrix.
+ * @param oForceMap		the force vector field this position should be matched to
+ * @param oTransMat		the transformation matrix containing rotation and translation (3x2)
+ * @param oImg			the prepared camera image of the car
+ * @param oMapImgSize	the size of the map image
+ * @return
  */
-double GetForceVectorLength(cv::Mat oForceMap, cv::Mat oTransMat, cv::Mat oImg, cv::Mat oMapImg)
+double GetMatchQuality(const cv::Mat& oForceMap, const cv::Mat& oTransMat, const cv::Mat& oImg, const cv::Size& oMapImgSize)
 {
-	cv::Rect2f oBoundingBox(cv::Point2f(0,0), oMapImg.size() * 2);
-    cv::Mat oRotatedImage;
-    warpAffine(oImg, oRotatedImage, oTransMat, oBoundingBox.size());
+	cv::Rect2f oBoundingBox(cv::Point2f(0,0), oMapImgSize * 2);
 
 	double oForceVectorLength = 0;
 
-	for (int x = 0; x < oRotatedImage.cols; x++)
+	for (int x = 0; x < oImg.cols; x++)
 	{
-		for (int y = 0; y < oRotatedImage.rows; y++)
+		for (int y = 0; y < oImg.rows; y++)
 		{
-			if (oRotatedImage.at<uchar>(y, x) > 128)
+			if (oImg.at<uchar>(y, x) > 128)
 			{
-				cv::Point oVectorFieldCoordinate = cv::Point(x, y) / VECTOR_FIELD_DISTANCE;
-
+				cv::Mat1d oValueMat(3, 1);
+				oValueMat.at<double>(0) = x;
+				oValueMat.at<double>(1) = y;
+				oValueMat.at<double>(2) = 1;
+				oValueMat = oTransMat * oValueMat;
+				cv::Point oVectorFieldCoordinate = cv::Point(oValueMat) / VECTOR_FIELD_DISTANCE;
 				cv::Rect rect(cv::Point(), oForceMap.size());
 				if (!rect.contains(oVectorFieldCoordinate))
 				{
 					continue;
 				}
+				if (GetVectorLength(oForceMap.at<cv::Point2d>(oVectorFieldCoordinate.y, oVectorFieldCoordinate.x)) <= 0)
+					std::cout << "weird force vector length!" << std::endl;
 
 				oForceVectorLength += GetVectorLength(oForceMap.at<cv::Point2d>(oVectorFieldCoordinate.y, oVectorFieldCoordinate.x));
 			}
@@ -109,7 +115,7 @@ double GetForceVectorLength(cv::Mat oForceMap, cv::Mat oTransMat, cv::Mat oImg, 
 }
 
 
-void GetGlobalPositionAndAngle(cv::Point2d& oPosition, double& dAngle, cv::Mat oImg)
+void GetGlobalPositionAndAngle(cv::Point2d& oPosition, double& dAngle, const cv::Mat& oImg)
 {
 	std::string sImagePath = ros::package::getPath(PACKAGE_NAME) + "/images/";
 	std::string sMapPath = ros::package::getPath(PACKAGE_NAME) + "/mapTables/";
@@ -119,8 +125,8 @@ void GetGlobalPositionAndAngle(cv::Point2d& oPosition, double& dAngle, cv::Mat o
 	fs["ForceMap"] >> oForceMap;
 
 	// for every meter there is a point
-	int nXDistance = (oMapImg.cols - 1) / round(oMapImg.cols / 50.0);
-	int nYDistance = (oMapImg.rows - 1) / round(oMapImg.rows / 50.0);
+	int nXDistance = (oMapImg.cols - 1) / round(oMapImg.cols / 100.0);
+	int nYDistance = (oMapImg.rows - 1) / round(oMapImg.rows / 100.0);
 	double dAngleDistance = 2.0 * M_PI / 16.0;
 
 	double dMinimumForceVectorLength = -1;
@@ -135,7 +141,7 @@ void GetGlobalPositionAndAngle(cv::Point2d& oPosition, double& dAngle, cv::Mat o
 			{
 				cv::Point oCurrentPos = cv::Point2d(x, y);
 				cv::Mat oTransMat = GetTransformationMatrix(oImg.cols, oImg.rows, oMapImg.cols, oMapImg.rows, oCurrentPos, dCurrentAngle);
-				double dForceVectorLength = GetForceVectorLength(oForceMap, oTransMat, oImg, oMapImg);
+				double dForceVectorLength = GetMatchQuality(oForceMap, oTransMat, oImg, oMapImg.size());
 
 //				std::cout << "x,y=(" << x << "," << y << ") angle=" << dCurrentAngle << " dForceVectorLength=" << dForceVectorLength << std::endl;
 
