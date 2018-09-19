@@ -63,6 +63,7 @@ public:
 	: m_oImgTransport(m_oNodeHandle), m_bWithUndistortion(false),
 	  m_bWithPublisher(false), m_pMatrixLocalization(pMatrixLocalization)
 	{
+//		cv::namedWindow("normal", cv::WINDOW_NORMAL);
 		m_oImageSub = m_oImgTransport.subscribe(sInputTopic, 1,
 				  &CForwardCameraUndistortion::ImageCallback, this, image_transport::TransportHints("compressed"));
 	}
@@ -75,7 +76,6 @@ public:
 
 private:
 
-	//! does not work yet
 	void FilterGreenLines(cv::Mat& oImg)
 	{
 		cv::Mat oHsvImg(oImg.size(), CV_8UC3);
@@ -254,15 +254,18 @@ private:
 		cv::Point2f aImagePoints[4];
 		cv::Point2f aObjectPoints[4];
 
-		aImagePoints[0] = cv::Point2f(37, 351);
-		aImagePoints[1] = cv::Point2f(603, 366);
-		aImagePoints[2] = cv::Point2f(205, 272);
-		aImagePoints[3] = cv::Point2f(429, 276);
+		// horizontal distance: 68 cm
+		aImagePoints[0] = cv::Point2f(0, 378);
+		aImagePoints[1] = cv::Point2f(639, 378);
+		// vertical distance: 136 cm
+		aImagePoints[2] = cv::Point2f(219, 264);
+		aImagePoints[3] = cv::Point2f(419, 264);
 
-		aObjectPoints[0] = cv::Point2f(218, 405);
-		aObjectPoints[1] = cv::Point2f(422, 405);
-		aObjectPoints[2] = cv::Point2f(218, 75);
-		aObjectPoints[3] = cv::Point2f(422, 75);
+
+		aObjectPoints[0] = cv::Point2f(217, 307);
+		aObjectPoints[1] = cv::Point2f(421, 307);
+		aObjectPoints[2] = cv::Point2f(217, 0);
+		aObjectPoints[3] = cv::Point2f(421, 0);
 
 		cv::Mat mPerspectiveTransform = cv::getPerspectiveTransform(aImagePoints, aObjectPoints);
 		cv::Mat mRectifiedImg;
@@ -290,7 +293,6 @@ private:
 		WarpPerspective(oImg);
 		FilterGreenLines(oImg);
 		ApplyThresholding(oImg);
-
 
 		if (m_bWithUndistortion)
 		{

@@ -147,18 +147,14 @@ protected:
 	 */
 	void PublishMapOverlay(cv::Mat oContourImg, cv::Mat oRotMat, cv::Point oCenter)
 	{
-
 		cv::Mat oMapImg = cv::Mat::zeros(m_oMapImg.size() * 2, CV_8UC3);
-		cv::Rect2f oBoundingBox(cv::Point2f(0,0), oMapImg.size());
+		cv::Rect2f oBoundingBox(cv::Point2f(0,0), m_oMapImg.size() * 2);
 
+		cv::Mat oTempContourImg = cv::Mat::zeros(m_oMapImg.size() * 2, CV_8UC1);
+		oContourImg.copyTo(oTempContourImg(cv::Rect(cv::Point(), oContourImg.size())));
 	    cv::Mat oRotatedImage, oBgrRotated;
-	    warpAffine(oContourImg, oRotatedImage, oRotMat, oBoundingBox.size());
-
-	    cv::Mat1b ch1 = cv::Mat1b::zeros(oRotatedImage.size());
-	    cv::Mat1b ch2 = oRotatedImage;
-	    cv::Mat1b ch3 = oRotatedImage;
-	    cv::Mat channels[3] = {ch1, ch2, ch3};
-	    cv::merge(channels, 3, oBgrRotated);
+	    // no scaling!
+	    cv::warpAffine(oTempContourImg, oRotatedImage, oRotMat, oTempContourImg.size(), cv::INTER_LINEAR);
 
 //		// publish the overlay to double check rotation and stuff
 		cv::Rect oRegionOfInterest = cv::Rect(oBoundingBox);
@@ -169,46 +165,39 @@ protected:
 		oCenter.x += oMapImg.cols / 4;
 		oCenter.y += oMapImg.rows / 4;
 
-		cv::Mat oDestinationRoi = oMapImg(oRegionOfInterest);
-		oBgrRotated.copyTo(oDestinationRoi, oRotatedImage);
 
+		cv::Point2d oForceVectorSum;
+		int counter = 0;
 
-//		cv::Point2d oForceVectorSum;
-//		int counter = 0;
-//
-//		for (int x = 0; x < oContourImg.cols; x++)
-//		{
-//			for (int y = 0; y < oContourImg.rows; y++)
-//			{
-//				if (oContourImg.at<int>(y, x) > 128)
-//				{
-//					cv::Mat1d oValueMat(3, 1);
-//					oValueMat.at<double>(0) = x;
-//					oValueMat.at<double>(1) = y;
-//					oValueMat.at<double>(2) = 1;
-//					oValueMat = oRotMat * oValueMat;
-//					cv::Point oVectorFieldCoordinate = cv::Point2d(oValueMat) / VECTOR_FIELD_DISTANCE;
-//					cv::Point oMapCoordinate = cv::Point(oValueMat);
-//					cv::Rect rect(cv::Point(), m_oForceMap.size());
-//					if (!rect.contains(oVectorFieldCoordinate))
-//					{
-//						continue;
-//					}
-//					cv::Point2d oForceVector = m_oForceMap.at<cv::Point2d>(oVectorFieldCoordinate.y, oVectorFieldCoordinate.x) * 100;
-//					oForceVectorSum += oForceVector;
-//					oMapImg.at<cv::Vec3b>(oMapCoordinate.y, oMapCoordinate.x) = cv::Vec3b(0,255,255);
-////					arrowedLine(oMapImg, oMapCoordinate, oMapCoordinate + cv::Point(oForceVector), cv::Scalar(255,255,0), 1, cv::LINE_AA);
-//					counter++;
-//				}
-//			}
-//		}
+		for (int x = 0; x < oRotatedImage.cols; x++)
+		{
+			for (int y = 0; y < oRotatedImage.rows; y++)
+			{
+				if (oRotatedImage.at<uchar>(y, x) > 128)
+				{
+					cv::Point oVectorFieldCoordinate = cv::Point(x, y) / VECTOR_FIELD_DISTANCE;
+					cv::Rect rect(cv::Point(), m_oForceMap.size());
+					if (!rect.contains(oVectorFieldCoordinate))
+					{
+//						std::cout << "out of forcemap range: " << oVectorFieldCoordinate << std::endl;
+						continue;
+					}
+					cv::Point2d oForceVector = m_oForceMap.at<cv::Point2d>(oVectorFieldCoordinate.y, oVectorFieldCoordinate.x) * 100;
+					cv::Point oMapCoordinate(x,y);
+					oForceVectorSum += oForceVector;
+					oMapImg.at<cv::Vec3b>(y, x) = cv::Vec3b(0,255,255);
+					arrowedLine(oMapImg, oMapCoordinate, oMapCoordinate + cv::Point(oForceVector), cv::Scalar(255,255,0), 1, cv::LINE_AA);
+
+					counter++;
+				}
+			}
+		}
 		cv::circle(oMapImg, oCenter, 8, cv::Scalar(0, 255, 0), -1);
-//		arrowedLine(oMapImg, oCenter, oCenter + cv::Point(oForceVectorSum / counter * 10), cv::Scalar(0,0,255), 2, cv::LINE_AA);
-
+		counter = counter == 0 ? 1 : counter;
+		arrowedLine(oMapImg, oCenter, oCenter + cv::Point(oForceVectorSum / counter * 10), cv::Scalar(0,0,255), 2, cv::LINE_AA);
 
 		sensor_msgs::ImagePtr oPubMsg = cv_bridge::CvImage(std_msgs::Header(),
 				sensor_msgs::image_encodings::BGR8, oMapImg).toImageMsg();
-		// Output modified video stream
 		m_oImagePub.publish(oPubMsg);
 	}
 
@@ -272,18 +261,18 @@ protected:
 		cv::Point2d oForceVector(0,0);
 		int counter = 0;
 
-		for (int x = 0; x < oImg.cols; x++)
+		cv::Rect2f oBoundingBox(cv::Point2f(0,0), m_oMapImg.size() * 2);
+	    cv::Mat oRotatedImage;
+	    warpAffine(oImg, oRotatedImage, oTransMat, oBoundingBox.size());
+
+		for (int x = 0; x < oRotatedImage.cols; x++)
 		{
-			for (int y = 0; y < oImg.rows; y++)
+			for (int y = 0; y < oRotatedImage.rows; y++)
 			{
-				if (oImg.at<int>(y, x) > 128)
+				// the type uchar is REALLY REALLY important
+				if (oRotatedImage.at<uchar>(y, x) > 128)
 				{
-					cv::Mat1d oValueMat(3, 1);
-					oValueMat.at<double>(0) = x;
-					oValueMat.at<double>(1) = y;
-					oValueMat.at<double>(2) = 1;
-					oValueMat = oTransMat * oValueMat;
-					cv::Point oVectorFieldCoordinate = cv::Point2d(oValueMat) / VECTOR_FIELD_DISTANCE;
+					cv::Point oVectorFieldCoordinate = cv::Point(round((double)x / VECTOR_FIELD_DISTANCE), round((double)y / VECTOR_FIELD_DISTANCE));
 
 					cv::Rect rect(cv::Point(), m_oForceMap.size());
 					if (!rect.contains(oVectorFieldCoordinate))
@@ -291,9 +280,9 @@ protected:
 						continue;
 					}
 
-					oForceVector += m_oForceMap.at<cv::Point2d>(oVectorFieldCoordinate.y, oVectorFieldCoordinate.x) * 100;
-					cv::Point2d distanceVec = cv::Point2d(oValueMat.at<double>(0) - oCenter.x, oValueMat.at<double>(1) - oCenter.y);
-					oTorque += distanceVec.cross(m_oForceMap.at<cv::Point2d>(oVectorFieldCoordinate.y, oVectorFieldCoordinate.x));
+					oForceVector += m_oForceMap.at<cv::Point2d>(oVectorFieldCoordinate.y, oVectorFieldCoordinate.x);
+					cv::Point2d distanceVec = cv::Point2d(x - oCenter.x, y - oCenter.y);
+					oTorque += distanceVec.cross(oForceVector);
 
 					counter++;
 				}

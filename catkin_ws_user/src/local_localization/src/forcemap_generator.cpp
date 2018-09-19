@@ -172,7 +172,6 @@ public:
 
 				cv::Point2d oForceVector = oWeightMap.at<double>(y, x, 0) * m_oDistanceMap.at<cv::Point2d>(y, x);
 
-
 				// brute-force-find the closest point / shortest vector of a contour:
 				// iterate through line segments, skipping the first
 				for (int nLineSegment = 1; nLineSegment < aLsdLines.size(); nLineSegment++)

@@ -79,23 +79,21 @@ cv::Mat GetTransformationMatrix(int nCamWidth, int nCamHeight, int nMapWidth, in
  * @param oCenter	the assumed position of the car in image coordinates
  * @return			the overall distance
  */
-double GetForceVectorLength(cv::Mat oForceMap, cv::Mat oTransMat, cv::Mat oImg, cv::Point oCenter)
+double GetForceVectorLength(cv::Mat oForceMap, cv::Mat oTransMat, cv::Mat oImg, cv::Mat oMapImg)
 {
-	double oForceVector;
-	int counter = 0;
+	cv::Rect2f oBoundingBox(cv::Point2f(0,0), oMapImg.size() * 2);
+    cv::Mat oRotatedImage;
+    warpAffine(oImg, oRotatedImage, oTransMat, oBoundingBox.size());
 
-	for (int x = 0; x < oImg.cols; x++)
+	double oForceVectorLength = 0;
+
+	for (int x = 0; x < oRotatedImage.cols; x++)
 	{
-		for (int y = 0; y < oImg.rows; y++)
+		for (int y = 0; y < oRotatedImage.rows; y++)
 		{
-			if (oImg.at<int>(y, x) > 128)
+			if (oRotatedImage.at<uchar>(y, x) > 128)
 			{
-				cv::Mat1d oValueMat(3, 1);
-				oValueMat.at<double>(0) = x;
-				oValueMat.at<double>(1) = y;
-				oValueMat.at<double>(2) = 1;
-				oValueMat = oTransMat * oValueMat;
-				cv::Point oVectorFieldCoordinate = cv::Point2d(oValueMat) / VECTOR_FIELD_DISTANCE;
+				cv::Point oVectorFieldCoordinate = cv::Point(x, y) / VECTOR_FIELD_DISTANCE;
 
 				cv::Rect rect(cv::Point(), oForceMap.size());
 				if (!rect.contains(oVectorFieldCoordinate))
@@ -103,11 +101,11 @@ double GetForceVectorLength(cv::Mat oForceMap, cv::Mat oTransMat, cv::Mat oImg, 
 					continue;
 				}
 
-				oForceVector += GetVectorLength(oForceMap.at<cv::Point2d>(oVectorFieldCoordinate.y, oVectorFieldCoordinate.x));
+				oForceVectorLength += GetVectorLength(oForceMap.at<cv::Point2d>(oVectorFieldCoordinate.y, oVectorFieldCoordinate.x));
 			}
 		}
 	}
-	return oForceVector;
+	return oForceVectorLength;
 }
 
 
@@ -137,9 +135,9 @@ void GetGlobalPositionAndAngle(cv::Point2d& oPosition, double& dAngle, cv::Mat o
 			{
 				cv::Point oCurrentPos = cv::Point2d(x, y);
 				cv::Mat oTransMat = GetTransformationMatrix(oImg.cols, oImg.rows, oMapImg.cols, oMapImg.rows, oCurrentPos, dCurrentAngle);
-				double dForceVectorLength = GetForceVectorLength(oForceMap, oTransMat, oImg, oCurrentPos);
+				double dForceVectorLength = GetForceVectorLength(oForceMap, oTransMat, oImg, oMapImg);
 
-				std::cout << "x,y=(" << x << "," << y << ") angle=" << dCurrentAngle << " dForceVectorLength=" << dForceVectorLength << std::endl;
+//				std::cout << "x,y=(" << x << "," << y << ") angle=" << dCurrentAngle << " dForceVectorLength=" << dForceVectorLength << std::endl;
 
 				if (dMinimumForceVectorLength < 0 || dMinimumForceVectorLength > dForceVectorLength)
 				{

@@ -65,7 +65,7 @@ double GetDistance(cv::Point3d oP1, cv::Point3d oP2)
 }
 
 /**
- * calculates length of a vector by calculating the distance between (0,0) and the Vector
+ * calculates length of a vector by calculating the distance between (0,0) and the Point
  * @param oVec	Vector, represented as Point2d
  * @return		length of the Vector
  */
@@ -75,7 +75,7 @@ double GetVectorLength(cv::Point2d oVec)
 }
 
 /**
- * calculates length of a vector by calculating the distance between (0,0,0) and the Vector
+ * calculates length of a vector by calculating the distance between (0,0,0) and the Point
  * @param oVec	Vector, represented as Point2d
  * @return		length of the Vector
  */
