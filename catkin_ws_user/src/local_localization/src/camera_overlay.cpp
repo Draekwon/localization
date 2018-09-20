@@ -376,8 +376,8 @@ protected:
 		double fDifferentialYaw = fYaw + fOdomYaw - fOldOdomYaw;
 		cv::Point3d oPosition = oCurrentPosePosition + oOdomPosePosition - oOldOdomPosePosition;
 
-		// this adds a normal deviation to the odometry like in the paper
-		// comment this out to save (a lot) of performance
+		//! this adds a normal deviation to the odometry like in the paper
+		//! comment this out to save (a lot) of performance
 //		{
 //			cv::RNG rng(12354);
 //			cv::Mat3d oRandomPositions(1,10);
@@ -417,18 +417,11 @@ protected:
 		// angle + value = turn right
 		double dAngleCorrection;
 		if (oTorque < 0)
-			// + 0.1 times the yaw difference between now and the last yaw
-			dAngleCorrection = (fOldOdomYaw - fOdomYaw) + (M_PI / 180);
+			dAngleCorrection -= (0.5 * M_PI / 180);
 		else
-			// - 0.1 times the yaw difference between now and the last yaw
-			dAngleCorrection = (fOdomYaw - fOldOdomYaw) - (M_PI / 180);
+			dAngleCorrection += (0.5 * M_PI / 180);
 
-		if (dAngleCorrection >= M_PI)
-			dAngleCorrection -= 2 * M_PI;
-		if (dAngleCorrection < -M_PI)
-			dAngleCorrection += 2 * M_PI;
-
-		dAngleCorrection *= 0.1;
+//		dAngleCorrection *= 0.1;
 
 
 		// force vectors are scaled, so that the longest one is 1cm (0.01m)
@@ -468,6 +461,11 @@ protected:
 		oPosition.y += std::isinf(oForceVector.y) || std::isnan(oForceVector.y) ? 0 : oForceVector.y;
 
 		fDifferentialYaw += dAngleCorrection;
+
+		if (fDifferentialYaw >= M_PI)
+			fDifferentialYaw -= 2 * M_PI;
+		if (fDifferentialYaw < -M_PI)
+			fDifferentialYaw += 2 * M_PI;
 
 
 		std::cout << "oTorque " << oTorque << ", fDifferentialYaw " << fDifferentialYaw << std::endl;

@@ -124,9 +124,11 @@ void GetGlobalPositionAndAngle(cv::Point2d& oPosition, double& dAngle, const cv:
 	cv::FileStorage fs(sMapPath + "forcemap.xml", cv::FileStorage::READ);
 	fs["ForceMap"] >> oForceMap;
 
+	const double dScalingInCm = 25;
+
 	// for every meter there is a point
-	int nXDistance = (oMapImg.cols - 1) / round(oMapImg.cols / 100.0);
-	int nYDistance = (oMapImg.rows - 1) / round(oMapImg.rows / 100.0);
+	int nXDistance = (oMapImg.cols - 1) / round(oMapImg.cols / dScalingInCm);
+	int nYDistance = (oMapImg.rows - 1) / round(oMapImg.rows / dScalingInCm);
 	double dAngleDistance = 2.0 * M_PI / 16.0;
 
 	double dMinimumForceVectorLength = -1;
@@ -143,17 +145,19 @@ void GetGlobalPositionAndAngle(cv::Point2d& oPosition, double& dAngle, const cv:
 				cv::Mat oTransMat = GetTransformationMatrix(oImg.cols, oImg.rows, oMapImg.cols, oMapImg.rows, oCurrentPos, dCurrentAngle);
 				double dForceVectorLength = GetMatchQuality(oForceMap, oTransMat, oImg, oMapImg.size());
 
-//				std::cout << "x,y=(" << x << "," << y << ") angle=" << dCurrentAngle << " dForceVectorLength=" << dForceVectorLength << std::endl;
+				std::cout << "x,y=(" << x << "," << y << ") angle=" << dCurrentAngle << " dForceVectorLength=" << dForceVectorLength << std::endl;
 
 				if (dMinimumForceVectorLength < 0 || dMinimumForceVectorLength > dForceVectorLength)
 				{
 					dMinimumForceVectorLength = dForceVectorLength;
-					oPosition = cv::Point2d(x,y) / 100;
+					oPosition = cv::Point2d(x,y) / 100.0;
 					dAngle = dCurrentAngle;
 				}
 			}
 		}
 	}
+	oPosition = cv::Point2d(0,0) / 100.0;
+	dAngle = 0;
 
 	clock_t t2 = clock();
 	std::cout << "global localization time: " << (float(t2 - t1)/CLOCKS_PER_SEC) << std::endl;

@@ -262,8 +262,8 @@ private:
 		aImagePoints[3] = cv::Point2f(419, 264);
 
 
-		aObjectPoints[0] = cv::Point2f(217, 307);
-		aObjectPoints[1] = cv::Point2f(421, 307);
+		aObjectPoints[0] = cv::Point2f(217, 407);
+		aObjectPoints[1] = cv::Point2f(421, 407);
 		aObjectPoints[2] = cv::Point2f(217, 0);
 		aObjectPoints[3] = cv::Point2f(421, 0);
 
