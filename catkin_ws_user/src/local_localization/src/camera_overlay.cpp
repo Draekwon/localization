@@ -130,6 +130,8 @@ public:
 
 protected:
 
+	bool m_bFirstOdom = true;
+
 	/**
 	 * this callback saves the current odometry in a class variable
 	 * @param msg	the odometry-message
@@ -137,6 +139,11 @@ protected:
 	void OdomCallback(const nav_msgs::OdometryConstPtr& msg)
 	{
 		m_oOdomPose = msg->pose.pose;
+		if (m_bFirstOdom)
+		{
+			m_bFirstOdom = false;
+			m_oOldOdomPose = m_oOdomPose;
+		}
 	}
 
 	/**
@@ -159,6 +166,7 @@ protected:
 
 		cv::Point2d oForceVectorSum;
 		int counter = 0;
+		int nArrowCounter = 0;
 
 		for (int x = 0; x < oContourImg.cols; x++)
 		{
@@ -179,10 +187,12 @@ protected:
 //						std::cout << "out of forcemap range: " << oVectorFieldCoordinate << std::endl;
 						continue;
 					}
-					cv::Point2d oForceVector = m_oForceMap.at<cv::Point2d>(oVectorFieldCoordinate.y, oVectorFieldCoordinate.x) * 100;
+					cv::Point2d oForceVector = m_oForceMap.at<cv::Point2d>(oVectorFieldCoordinate.y, oVectorFieldCoordinate.x) * 1000;
 					oForceVectorSum += oForceVector;
-					oMapImg.at<cv::Vec3b>(oMapCoordinate.y, oMapCoordinate.x) = cv::Vec3b(0,255,255);
-					arrowedLine(oMapImg, oMapCoordinate, oMapCoordinate + cv::Point(oForceVector), cv::Scalar(255,255,0), 1, cv::LINE_AA);
+
+					if (nArrowCounter == 0)
+						arrowedLine(oMapImg, oMapCoordinate, oMapCoordinate + cv::Point(oForceVector), cv::Scalar(255,255,0), 1, cv::LINE_AA);
+					nArrowCounter = ++nArrowCounter % 9;
 
 					counter++;
 				}
@@ -279,7 +289,8 @@ protected:
 					}
 
 					oForceVector += m_oForceMap.at<cv::Point2d>(oVectorFieldCoordinate.y, oVectorFieldCoordinate.x);
-					cv::Point2d distanceVec = cv::Point2d(x - oCenter.x, y - oCenter.y);
+					cv::Point oMapCoordinate = cv::Point(oValueMat);
+					cv::Point2d distanceVec = cv::Point2d(oMapCoordinate.x - oCenter.x, oMapCoordinate.y - oCenter.y);
 					oTorque += distanceVec.cross(oForceVector);
 
 					counter++;
@@ -287,8 +298,8 @@ protected:
 			}
 		}
 
-		oForceVector /= counter == 0 ? 1 : counter;
-		oTorque /= counter == 0 ? 1 : counter;
+//		oForceVector = counter == 0 ? 1 : counter;
+//		oTorque /= counter == 0 ? 1 : counter;
 		return oForceVector * CM_TO_M;
 	}
 
@@ -373,8 +384,19 @@ protected:
 		cv::Point3d oOldOdomPosePosition(m_oOldOdomPose.position.x, m_oOldOdomPose.position.y, m_oOldOdomPose.position.z);
 		cv::Point3d oCurrentPosePosition(m_oCurrentPose.position.x, m_oCurrentPose.position.y, m_oCurrentPose.position.z);
 
-		double fDifferentialYaw = fYaw + fOdomYaw - fOldOdomYaw;
-		cv::Point3d oPosition = oCurrentPosePosition + oOdomPosePosition - oOldOdomPosePosition;
+		double fDifferentialYaw;
+		cv::Point3d oPosition;
+
+		if (!m_bFirstOdom)
+		{
+			fDifferentialYaw = fYaw + (fOdomYaw - fOldOdomYaw);
+			oPosition = oCurrentPosePosition + oOdomPosePosition - oOldOdomPosePosition;
+		}
+		else
+		{
+			fDifferentialYaw = fYaw ;
+			oPosition = oCurrentPosePosition;
+		}
 
 		//! this adds a normal deviation to the odometry like in the paper
 		//! comment this out to save (a lot) of performance
@@ -416,19 +438,29 @@ protected:
 		// angle - value = turn left
 		// angle + value = turn right
 		double dAngleCorrection;
+
+		double dTorqueMin = std::min(0.001 * abs(oTorque), 0.5 * M_PI / 180);
+
+
 		if (oTorque < 0)
-			dAngleCorrection -= (0.5 * M_PI / 180);
+			dAngleCorrection -= dTorqueMin ;
 		else
-			dAngleCorrection += (0.5 * M_PI / 180);
+			dAngleCorrection += dTorqueMin;
 
 //		dAngleCorrection *= 0.1;
+
+
+		double dForceVecLen = std::min(0.1 * GetVectorLength(oForceVector), 0.01);
+		std::cout << "forceVecLen: " << GetVectorLength(oForceVector) << std::endl;
 
 
 		// force vectors are scaled, so that the longest one is 1cm (0.01m)
 		// scale them
 		oForceVector /= GetVectorLength(oForceVector);
 		// 10% of the odometry movement is error correction
-		oForceVector *= GetVectorLength(oOdomPosePosition - oOldOdomPosePosition) * 0.1 + 0.01;
+
+
+		oForceVector *= 1 * (GetVectorLength(oOdomPosePosition - oOldOdomPosePosition) * 0.1  + dForceVecLen);
 		//oForceVector *= 0.01; // 1cm
 
 		if (m_bIsFirstTime && !m_bIsLocalizing)
@@ -437,10 +469,13 @@ protected:
 
 			cv::Point2d oFirstPosition;
 			double dFirstAngle;
-			GetGlobalPositionAndAngle(oFirstPosition, dFirstAngle, oPreparedCameraImg);
-			oPosition.x = oFirstPosition.x;
-			oPosition.y = oFirstPosition.y;
-			fDifferentialYaw = dFirstAngle;
+//			GetGlobalPositionAndAngle(oFirstPosition, dFirstAngle, oPreparedCameraImg);
+//			oPosition.x = oFirstPosition.x;
+//			oPosition.y = oFirstPosition.y;
+//			fDifferentialYaw = dFirstAngle;
+			oPosition.x = 0;
+			oPosition.y = 0;
+			fDifferentialYaw = 0;
 
 			oForceVector = cv::Point2d(0,0);
 			dAngleCorrection = 0;
