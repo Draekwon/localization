@@ -121,10 +121,10 @@ void GetGlobalPositionAndAngle(cv::Point2d& oPosition, double& dAngle, const cv:
 	std::string sMapPath = ros::package::getPath(PACKAGE_NAME) + "/mapTables/";
 	cv::Mat oMapImg = cv::imread(sImagePath + "fu_robotics_lab_map.jpg", cv::IMREAD_GRAYSCALE);
 	cv::Mat oForceMap;
-	cv::FileStorage fs(sMapPath + "forcemap.xml", cv::FileStorage::READ);
-	fs["ForceMap"] >> oForceMap;
+	cv::FileStorage fs(sMapPath + "distancemap.xml", cv::FileStorage::READ);
+	fs["DistanceMap"] >> oForceMap;
 
-	const double dScalingInCm = 25;
+	const double dScalingInCm = 50;
 
 	// for every meter there is a point
 	int nXDistance = (oMapImg.cols - 1) / round(oMapImg.cols / dScalingInCm);
@@ -145,7 +145,7 @@ void GetGlobalPositionAndAngle(cv::Point2d& oPosition, double& dAngle, const cv:
 				cv::Mat oTransMat = GetTransformationMatrix(oImg.cols, oImg.rows, oMapImg.cols, oMapImg.rows, oCurrentPos, dCurrentAngle);
 				double dForceVectorLength = GetMatchQuality(oForceMap, oTransMat, oImg, oMapImg.size());
 
-				std::cout << "x,y=(" << x << "," << y << ") angle=" << dCurrentAngle << " dForceVectorLength=" << dForceVectorLength << std::endl;
+//				std::cout << "x,y=(" << x << "," << y << ") angle=" << dCurrentAngle << " dForceVectorLength=" << dForceVectorLength << std::endl;
 
 				if (dMinimumForceVectorLength < 0 || dMinimumForceVectorLength > dForceVectorLength)
 				{
@@ -156,7 +156,7 @@ void GetGlobalPositionAndAngle(cv::Point2d& oPosition, double& dAngle, const cv:
 			}
 		}
 	}
-	oPosition = cv::Point2d(0,0) / 100.0;
+	oPosition = cv::Point2d(0,0);
 	dAngle = 0;
 
 	clock_t t2 = clock();
