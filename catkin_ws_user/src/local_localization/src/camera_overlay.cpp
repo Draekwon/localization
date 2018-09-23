@@ -55,8 +55,7 @@ class CCameraOverlay
 	ros::Publisher vis_pub;
 
 	cv::Mat m_oMapImg;
-	cv::Mat m_oForceMap;
-	cv::Mat m_oDistanceMap;
+	cv::Mat m_oVectorField;
 
 	ros::Subscriber m_oOdomSub;
 
@@ -87,10 +86,10 @@ public:
 		m_oMapImg = imread(sImagePath + "fu_robotics_lab_map.jpg", cv::IMREAD_GRAYSCALE);
 //		m_oMapImg = imread(sImagePath + "Lab_map_600x400.png", cv::IMREAD_GRAYSCALE);
 
-		cv::FileStorage fs(sMapPath + "forcemap.xml", cv::FileStorage::READ);
-		fs["ForceMap"] >> m_oForceMap;
-		cv::FileStorage fs2(sMapPath + "distancemap.xml", cv::FileStorage::READ);
-		fs2["DistanceMap"] >> m_oDistanceMap;
+		cv::FileStorage fs(sMapPath + "forcemap_4.xml", cv::FileStorage::READ);
+		fs["ForceMap"] >> m_oVectorField;
+//		cv::FileStorage fs2(sMapPath + "distancemap_4.xml", cv::FileStorage::READ);
+//		fs2["DistanceMap"] >> m_oVectorField;
 
 		m_oOdomPose.position.x = 0;
 		m_oOdomPose.position.y = 0;
@@ -181,15 +180,16 @@ protected:
 					oValueMat = oRotMat * oValueMat;
 					cv::Point oVectorFieldCoordinate = cv::Point(oValueMat) / VECTOR_FIELD_DISTANCE;
 					cv::Point oMapCoordinate = cv::Point(oValueMat);
-					cv::Rect rect(cv::Point(), m_oForceMap.size());
+					cv::Rect rect(cv::Point(), m_oVectorField.size());
 					if (!rect.contains(oVectorFieldCoordinate))
 					{
 //						std::cout << "out of forcemap range: " << oVectorFieldCoordinate << std::endl;
 						continue;
 					}
-					cv::Point2d oForceVector = m_oForceMap.at<cv::Point2d>(oVectorFieldCoordinate.y, oVectorFieldCoordinate.x) * 1000;
+					cv::Point2d oForceVector = m_oVectorField.at<cv::Point2d>(oVectorFieldCoordinate.y, oVectorFieldCoordinate.x) * 1000;
 					oForceVectorSum += oForceVector;
 
+					oMapImg.at<cv::Vec3b>(oMapCoordinate.y, oMapCoordinate.x) = cv::Vec3b(0,255,255);
 					if (nArrowCounter == 0)
 						arrowedLine(oMapImg, oMapCoordinate, oMapCoordinate + cv::Point(oForceVector), cv::Scalar(255,255,0), 1, cv::LINE_AA);
 					nArrowCounter = ++nArrowCounter % 9;
@@ -282,13 +282,13 @@ protected:
 					oValueMat.at<double>(2) = 1;
 					oValueMat = oTransMat * oValueMat;
 					cv::Point oVectorFieldCoordinate = cv::Point(oValueMat) / VECTOR_FIELD_DISTANCE;
-					cv::Rect rect(cv::Point(), m_oForceMap.size());
+					cv::Rect rect(cv::Point(), m_oVectorField.size());
 					if (!rect.contains(oVectorFieldCoordinate))
 					{
 						continue;
 					}
 
-					oForceVector += m_oForceMap.at<cv::Point2d>(oVectorFieldCoordinate.y, oVectorFieldCoordinate.x);
+					oForceVector += m_oVectorField.at<cv::Point2d>(oVectorFieldCoordinate.y, oVectorFieldCoordinate.x);
 					cv::Point oMapCoordinate = cv::Point(oValueMat);
 					cv::Point2d distanceVec = cv::Point2d(oMapCoordinate.x - oCenter.x, oMapCoordinate.y - oCenter.y);
 					oTorque += distanceVec.cross(oForceVector);
@@ -371,8 +371,6 @@ protected:
 	{
 		clock_t t1 = clock();
 
-		cv::Mat oPreparedCameraImg = PrepareCameraImage(oImg);
-
 		// this should basically be the odometry of the car
 		double fOdomYaw = tf::getYaw(m_oOdomPose.orientation);
 		double fOldOdomYaw = tf::getYaw(m_oOldOdomPose.orientation);
@@ -389,7 +387,7 @@ protected:
 
 		if (!m_bFirstOdom)
 		{
-			fDifferentialYaw = fYaw + (fOdomYaw - fOldOdomYaw);
+			fDifferentialYaw = fYaw + fOdomYaw - fOldOdomYaw;
 			oPosition = oCurrentPosePosition + oOdomPosePosition - oOldOdomPosePosition;
 		}
 		else
@@ -425,43 +423,42 @@ protected:
 //			}
 //		}
 
-		double oTorque = 0;
-		//! oCenter is the position of the car in image coordinates
+		double dTorque = 0;
+		//! oCenter is the position of the car in image coordinates (cm, since we defined 1px = 1cm on the map image)
 		cv::Point oCenter = cv::Point(oPosition.x * M_TO_CM, oPosition.y * M_TO_CM);
 
+		cv::Mat oPreparedCameraImg = PrepareCameraImage(oImg);
 		cv::Mat oTransformationMat = GetTransformationMatrix(oPreparedCameraImg.cols, oPreparedCameraImg.rows,
 				m_oMapImg.cols, m_oMapImg.rows, oCenter, -fDifferentialYaw);
 		// force in meter
-		cv::Point2d oForceVector = GetForceVector(oTransformationMat, oPreparedCameraImg, oTorque, oCenter);
-
+		cv::Point2d oForceVector = GetForceVector(oTransformationMat, oPreparedCameraImg, dTorque, oCenter);
 
 		// angle - value = turn left
 		// angle + value = turn right
 		double dAngleCorrection;
 
-		double dTorqueMin = std::min(0.001 * abs(oTorque), 0.5 * M_PI / 180);
+		double dTorqueMin = std::min(0.0001 * abs(dTorque), 0.1 * M_PI / 180);
+		if (dTorqueMin < 0.01 * M_PI / 180)
+			dTorqueMin = 0;
 
+		std::cout << "dTorqueMin: " << dTorqueMin << std::endl;
 
-		if (oTorque < 0)
-			dAngleCorrection -= dTorqueMin ;
+		if (dTorque < 0)
+			dAngleCorrection -= 0.1 * abs(fOdomYaw - fOldOdomYaw) + dTorqueMin ;
 		else
-			dAngleCorrection += dTorqueMin;
+			dAngleCorrection += 0.1 * abs(fOdomYaw - fOldOdomYaw) + dTorqueMin;
 
-//		dAngleCorrection *= 0.1;
+		double dForceVecLen = std::min(0.01 * GetVectorLength(oForceVector), 0.001);
+		if (dForceVecLen < 0.0004)
+			dForceVecLen = 0;
 
+		std::cout << "dForceVecLen: " << dForceVecLen << std::endl;
 
-		double dForceVecLen = std::min(0.1 * GetVectorLength(oForceVector), 0.01);
-		std::cout << "forceVecLen: " << GetVectorLength(oForceVector) << std::endl;
-
-
-		// force vectors are scaled, so that the longest one is 1cm (0.01m)
-		// scale them
+		// normalize the force vector
 		oForceVector /= GetVectorLength(oForceVector);
-		// 10% of the odometry movement is error correction
-
-
-		oForceVector *= 1 * (GetVectorLength(oOdomPosePosition - oOldOdomPosePosition) * 0.1  + dForceVecLen);
-		//oForceVector *= 0.01; // 1cm
+		// set the length of the force vector that will be added to the odometry as correction
+		// right now its 10% of the length of the movement + at most 0.01
+		oForceVector *= (GetVectorLength(oOdomPosePosition - oOldOdomPosePosition) * 0.1  + dForceVecLen);
 
 		if (m_bIsFirstTime && !m_bIsLocalizing)
 		{
@@ -469,13 +466,13 @@ protected:
 
 			cv::Point2d oFirstPosition;
 			double dFirstAngle;
-//			GetGlobalPositionAndAngle(oFirstPosition, dFirstAngle, oPreparedCameraImg);
-//			oPosition.x = oFirstPosition.x;
-//			oPosition.y = oFirstPosition.y;
-//			fDifferentialYaw = dFirstAngle;
-			oPosition.x = 0;
-			oPosition.y = 0;
-			fDifferentialYaw = 0;
+			GetGlobalPositionAndAngle(oFirstPosition, dFirstAngle, oPreparedCameraImg);
+			oPosition.x = oFirstPosition.x;
+			oPosition.y = oFirstPosition.y;
+			fDifferentialYaw = dFirstAngle;
+//			oPosition.x = 0;
+//			oPosition.y = 0;
+//			fDifferentialYaw = 0;
 
 			oForceVector = cv::Point2d(0,0);
 			dAngleCorrection = 0;
@@ -483,9 +480,9 @@ protected:
 			m_bIsLocalizing = false;
 
 		}
-		else if (m_bIsFirstTime)
+		else if (m_bIsFirstTime && m_bIsLocalizing)
 		{
-			// dont do shit
+			// if the global localization is running, dont do anything
 			return;
 		}
 
@@ -503,7 +500,7 @@ protected:
 			fDifferentialYaw += 2 * M_PI;
 
 
-		std::cout << "oTorque " << oTorque << ", fDifferentialYaw " << fDifferentialYaw << std::endl;
+		std::cout << "oTorque " << dTorque << ", fDifferentialYaw " << fDifferentialYaw << std::endl;
 		std::cout << "Position: " << oPosition << ", forcevector: " << oForceVector << std::endl;
 
 		if (m_bPublishOverlay)
