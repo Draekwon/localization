@@ -214,8 +214,8 @@ void GetGlobalPositionAndAngle(cv::Point2d& oPosition, double& dAngle, const cv:
 				double dMatchQuality = GetMatchQuality(oVectorField, oTransMat, oImg, oMapImg.size());
 
 				std::cout << "x,y=(" << x << "," << y << ") angle=" << dCurrentAngle << " dMatchQuality=" << dMatchQuality << std::endl;
-				if (dMatchQuality < 0.05)
-					ShowPos(oImg, oTransMat, oCurrentPos, oMapImg, oVectorField);
+//				if (dMatchQuality < 0.05)
+//					ShowPos(oImg, oTransMat, oCurrentPos, oMapImg, oVectorField);
 
 				if (dMinimumForceVectorLength < 0 || dMinimumForceVectorLength > dMatchQuality)
 				{

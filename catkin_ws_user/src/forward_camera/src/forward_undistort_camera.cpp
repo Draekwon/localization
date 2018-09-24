@@ -48,7 +48,7 @@ public:
 
 		m_oImagePub = m_oImgTransport.advertise(sOutputTopic, 1);
 		m_oImageSub = m_oImgTransport.subscribe(sInputTopic, 1,
-				  &CForwardCameraUndistortion::ImageCallback, this, image_transport::TransportHints("compressed"));
+				  &CForwardCameraUndistortion::ImageCallback, this/*, image_transport::TransportHints("compressed") */);
 	}
 
 	CForwardCameraUndistortion(const std::string& sInputTopic, const std::string& sOutputTopic)
@@ -56,7 +56,7 @@ public:
 	{
 		m_oImagePub = m_oImgTransport.advertise(sOutputTopic, 1);
 		m_oImageSub = m_oImgTransport.subscribe(sInputTopic, 1,
-				  &CForwardCameraUndistortion::ImageCallback, this, image_transport::TransportHints("compressed"));
+				  &CForwardCameraUndistortion::ImageCallback, this/*, image_transport::TransportHints("compressed") */);
 	}
 
 	CForwardCameraUndistortion(const std::string& sInputTopic, CCameraOverlay* pMatrixLocalization)
@@ -65,7 +65,7 @@ public:
 	{
 //		cv::namedWindow("normal", cv::WINDOW_NORMAL);
 		m_oImageSub = m_oImgTransport.subscribe(sInputTopic, 1,
-				  &CForwardCameraUndistortion::ImageCallback, this, image_transport::TransportHints("compressed"));
+				  &CForwardCameraUndistortion::ImageCallback, this /*, image_transport::TransportHints("compressed") */);
 	}
 
 	~CForwardCameraUndistortion()
@@ -89,7 +89,7 @@ private:
 //		cv::dilate(oAdaptiveImg, oAdaptiveImg, cv::Mat(), cv::Point(-1,-1), 1);
 
 		cv::Mat oRangedImg(oImg.size(), CV_8UC1);
-		cv::inRange(oHsvImg, cv::Scalar(0, 100, 75), cv::Scalar(255, 255, 180), oRangedImg);
+		cv::inRange(oHsvImg, cv::Scalar(10, 0, 0), cv::Scalar(20, 255, 200), oRangedImg);
 		cv::erode(oRangedImg, oRangedImg, cv::Mat(), cv::Point(-1, -1), 2);
 		cv::dilate(oRangedImg, oRangedImg, cv::Mat(), cv::Point(-1,-1), 2);
 
@@ -102,11 +102,6 @@ private:
 //		cv::Mat oBitwiseImg;
 //		cv::bitwise_and(oAdaptiveImg, oRangedImg, oBitwiseImg);
 //
-//
-//		cv::imshow("adaptive", oAdaptiveImg);
-//		cv::imshow("hsv", oRangedImg);
-//		cv::imshow("bitwise", oBitwiseImg);
-
 
 		// lines to top
 //		for (int x = oImg.cols-1; x >= 0; x--)
@@ -162,7 +157,6 @@ private:
 			}
 		}
 
-//		cv::imshow("masked", oImg);
 	}
 
 
@@ -255,17 +249,17 @@ private:
 		cv::Point2f aObjectPoints[4];
 
 		// horizontal distance: 68 cm
-		aImagePoints[0] = cv::Point2f(0, 378);
-		aImagePoints[1] = cv::Point2f(639, 378);
-		// vertical distance: 136 cm
-		aImagePoints[2] = cv::Point2f(219, 264);
-		aImagePoints[3] = cv::Point2f(419, 264);
+		aImagePoints[0] = cv::Point2f(0, 421);
+		aImagePoints[1] = cv::Point2f(639, 421);
+		// vertical distance: 116 cm
+		aImagePoints[2] = cv::Point2f(195, 302);
+		aImagePoints[3] = cv::Point2f(419, 302);
 
 
-		aObjectPoints[0] = cv::Point2f(217, 407);
-		aObjectPoints[1] = cv::Point2f(421, 407);
-		aObjectPoints[2] = cv::Point2f(217, 0);
-		aObjectPoints[3] = cv::Point2f(421, 0);
+		aObjectPoints[0] = cv::Point2f(217, 434);
+		aObjectPoints[1] = cv::Point2f(421, 434);
+		aObjectPoints[2] = cv::Point2f(217, 86);
+		aObjectPoints[3] = cv::Point2f(421, 86);
 
 		cv::Mat mPerspectiveTransform = cv::getPerspectiveTransform(aImagePoints, aObjectPoints);
 		cv::Mat mRectifiedImg;
@@ -291,8 +285,14 @@ private:
 		pCvImg->image.copyTo(oImg);
 
 		WarpPerspective(oImg);
+//		cv::imshow("WarpPerspective", oImg);
 		FilterGreenLines(oImg);
+//		cv::imshow("FilterGreenLines", oImg);
 		ApplyThresholding(oImg);
+
+//		cv::imshow("ApplyThresholding", oImg);
+//		cv::waitKey(1);
+//		return;
 
 		if (m_bWithUndistortion)
 		{
@@ -348,7 +348,7 @@ int main(int argc, char** argv)
 	// parse command line arguments
     cv::CommandLineParser parser(argc, argv,
                                  "{i|out_camera_params.xml|input file}"
-								 "{ti|/app/camera/rgb/image_rect_color|ros image topic}"
+								 "{ti|//camera/color/image_rect_color|ros image topic}"
 			 	 	 	 	 	 "{to|/forward_rectified|rectified image topic}"
                                  "{help||show help}"
                                  );

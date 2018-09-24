@@ -151,7 +151,7 @@ protected:
 	 * @param fYaw			the angle in radians
 	 * @param oCenter		the assumed position of the car in pixel coordinates
 	 */
-	void PublishMapOverlay(cv::Mat oContourImg, cv::Mat oRotMat, cv::Point oCenter)
+	void PublishMapOverlay(const cv::Mat& oContourImg, const cv::Mat& oRotMat, cv::Point& oCenter, cv::Point3d& oOdomCenter)
 	{
 		cv::Mat oMapImg = cv::Mat::zeros(m_oMapImg.size() * 2, CV_8UC3);
 		cv::Rect2f oBoundingBox(cv::Point2f(0,0), m_oMapImg.size() * 2);
@@ -159,6 +159,9 @@ protected:
 		cv::Mat oBgrMap;
 		cv::cvtColor(m_oMapImg, oBgrMap, cv::COLOR_GRAY2BGR);
 		oBgrMap.copyTo(oMapImg(cv::Rect(oMapImg.size() / 4, m_oMapImg.size())));
+		oOdomCenter *= M_TO_CM;
+		oOdomCenter.x += oMapImg.cols / 4;
+		oOdomCenter.y += oMapImg.rows / 4;
 		oCenter.x += oMapImg.cols / 4;
 		oCenter.y += oMapImg.rows / 4;
 
@@ -198,6 +201,7 @@ protected:
 				}
 			}
 		}
+		cv::circle(oMapImg, cv::Point(oOdomCenter.x, oOdomCenter.y), 8, cv::Scalar(255, 0, 255), -1);
 		cv::circle(oMapImg, oCenter, 8, cv::Scalar(0, 255, 0), -1);
 		counter = counter == 0 ? 1 : counter;
 		arrowedLine(oMapImg, oCenter, oCenter + cv::Point(oForceVectorSum / counter * 10), cv::Scalar(0,0,255), 2, cv::LINE_AA);
@@ -385,6 +389,12 @@ protected:
 		double fDifferentialYaw;
 		cv::Point3d oPosition;
 
+		double dOdomDiff;
+		if ((fOdomYaw < -2 && fOldOdomYaw > 2) || (fOdomYaw > 2 && fOldOdomYaw < -2))
+			dOdomDiff = abs(fOdomYaw + fOldOdomYaw);
+		else
+			dOdomDiff = abs(fOdomYaw - fOldOdomYaw);
+
 		if (!m_bFirstOdom)
 		{
 			fDifferentialYaw = fYaw + fOdomYaw - fOldOdomYaw;
@@ -401,7 +411,7 @@ protected:
 //		{
 //			cv::RNG rng(12354);
 //			cv::Mat3d oRandomPositions(1,10);
-//			cv::Vec3d deviation(abs(oOdomPosePosition.x - oOldOdomPosePosition.x), abs(oOdomPosePosition.y - oOldOdomPosePosition.y), abs(fOdomYaw - fOldOdomYaw));
+//			cv::Vec3d deviation(abs(oOdomPosePosition.x - oOldOdomPosePosition.x), abs(oOdomPosePosition.y - oOldOdomPosePosition.y), dOdomDiff);
 //			rng.fill(oRandomPositions, cv::RNG::NORMAL, cv::Vec3d(oPosition.x, oPosition.y, fDifferentialYaw), deviation);
 //			double dRating = -1;
 //			for (int nCol = 0; nCol < oRandomPositions.cols; nCol++)
@@ -444,9 +454,9 @@ protected:
 		std::cout << "dTorqueMin: " << dTorqueMin << std::endl;
 
 		if (dTorque < 0)
-			dAngleCorrection -= 0.1 * abs(fOdomYaw - fOldOdomYaw) + dTorqueMin ;
+			dAngleCorrection -= 0.1 * dOdomDiff + dTorqueMin ;
 		else
-			dAngleCorrection += 0.1 * abs(fOdomYaw - fOldOdomYaw) + dTorqueMin;
+			dAngleCorrection += 0.1 * dOdomDiff + dTorqueMin;
 
 		double dForceVecLen = std::min(0.01 * GetVectorLength(oForceVector), 0.001);
 		if (dForceVecLen < 0.0004)
@@ -466,13 +476,13 @@ protected:
 
 			cv::Point2d oFirstPosition;
 			double dFirstAngle;
-			GetGlobalPositionAndAngle(oFirstPosition, dFirstAngle, oPreparedCameraImg);
-			oPosition.x = oFirstPosition.x;
-			oPosition.y = oFirstPosition.y;
-			fDifferentialYaw = dFirstAngle;
-//			oPosition.x = 0;
-//			oPosition.y = 0;
-//			fDifferentialYaw = 0;
+//			GetGlobalPositionAndAngle(oFirstPosition, dFirstAngle, oPreparedCameraImg);
+//			oPosition.x = oFirstPosition.x;
+//			oPosition.y = oFirstPosition.y;
+//			fDifferentialYaw = dFirstAngle;
+			oPosition.x = 0;
+			oPosition.y = 0;
+			fDifferentialYaw = 0;
 
 			oForceVector = cv::Point2d(0,0);
 			dAngleCorrection = 0;
@@ -504,7 +514,7 @@ protected:
 		std::cout << "Position: " << oPosition << ", forcevector: " << oForceVector << std::endl;
 
 		if (m_bPublishOverlay)
-			PublishMapOverlay(oPreparedCameraImg, oTransformationMat, oCenter);
+			PublishMapOverlay(oPreparedCameraImg, oTransformationMat, oCenter, oOdomPosePosition);
 
 		nav_msgs::Odometry odom;
 		odom.header.stamp = ros::Time::now();
