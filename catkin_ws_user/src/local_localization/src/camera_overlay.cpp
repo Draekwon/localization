@@ -18,6 +18,7 @@
 #include "cv_bridge/cv_bridge.h"
 #include "sensor_msgs/image_encodings.h"
 #include "std_msgs/String.h"
+#include "tf/tf.h"
 #include "tf/transform_broadcaster.h"
 #include "nav_msgs/Odometry.h"
 #include "geometry_msgs/Point.h"
@@ -46,11 +47,12 @@ class CCameraOverlay
 	image_transport::Subscriber m_oImageSub;
 	image_transport::Publisher m_oImagePub;
 	ros::Publisher m_oOdomPub;
+	tf::TransformBroadcaster m_oTransformPub;
 
+	geometry_msgs::Pose m_oVisualOdomPose;
 	geometry_msgs::Pose m_oOdomPose;
 	geometry_msgs::Pose m_oOldOdomPose;
 	geometry_msgs::Pose m_oCurrentPose;
-
 
 	ros::Publisher vis_pub;
 
@@ -58,6 +60,7 @@ class CCameraOverlay
 	cv::Mat m_oVectorField;
 
 	ros::Subscriber m_oOdomSub;
+	ros::Subscriber m_oVisualOdomSub;
 
 	bool 	m_bPublishOverlay;
 	double	m_fScaleFactor;
@@ -119,17 +122,30 @@ public:
 			m_oImageSub = m_oImgTransport.subscribe(sImageTopic, 1,
 			  &CCameraOverlay::ImageCallback, this, image_transport::TransportHints("compressed"));
 		}
+		m_oVisualOdomSub = m_oNodeHandle.subscribe("/localization/odom/0", 1, &CCameraOverlay::VisualOdomCallback, this);
 		m_oOdomSub = m_oNodeHandle.subscribe("/odom", 1, &CCameraOverlay::OdomCallback, this);
 	}
 
 	~CCameraOverlay()
 	{
+
 	}
 
 
 protected:
 
+	bool m_bVisualOdomSet = false;
 	bool m_bFirstOdom = true;
+
+	void VisualOdomCallback(const nav_msgs::OdometryConstPtr& msg)
+	{
+		m_oVisualOdomPose = msg->pose.pose;
+		if (!m_bVisualOdomSet)
+		{
+			m_oCurrentPose = msg->pose.pose;
+			m_bVisualOdomSet = true;
+		}
+	}
 
 	/**
 	 * this callback saves the current odometry in a class variable
@@ -151,7 +167,7 @@ protected:
 	 * @param fYaw			the angle in radians
 	 * @param oCenter		the assumed position of the car in pixel coordinates
 	 */
-	void PublishMapOverlay(const cv::Mat& oContourImg, const cv::Mat& oRotMat, cv::Point& oCenter, cv::Point3d& oOdomCenter)
+	void PublishMapOverlay(const cv::Mat& oContourImg, const cv::Mat& oRotMat, cv::Point& oCenter, cv::Point3d& oOdomCenter, cv::Point3d& oVisualOdomCenter)
 	{
 		cv::Mat oMapImg = cv::Mat::zeros(m_oMapImg.size() * 2, CV_8UC3);
 		cv::Rect2f oBoundingBox(cv::Point2f(0,0), m_oMapImg.size() * 2);
@@ -162,6 +178,9 @@ protected:
 		oOdomCenter *= M_TO_CM;
 		oOdomCenter.x += oMapImg.cols / 4;
 		oOdomCenter.y += oMapImg.rows / 4;
+		oVisualOdomCenter *= M_TO_CM;
+		oVisualOdomCenter.x += oMapImg.cols / 4;
+		oVisualOdomCenter.y += oMapImg.rows / 4;
 		oCenter.x += oMapImg.cols / 4;
 		oCenter.y += oMapImg.rows / 4;
 
@@ -201,8 +220,9 @@ protected:
 				}
 			}
 		}
-		cv::circle(oMapImg, cv::Point(oOdomCenter.x, oOdomCenter.y), 8, cv::Scalar(255, 0, 255), -1);
-		cv::circle(oMapImg, oCenter, 8, cv::Scalar(0, 255, 0), -1);
+		cv::circle(oMapImg, cv::Point(oVisualOdomCenter.x, oOdomCenter.y), 5, cv::Scalar(255, 0, 0), -1);
+		cv::circle(oMapImg, cv::Point(oOdomCenter.x, oOdomCenter.y), 5, cv::Scalar(255, 0, 255), -1);
+		cv::circle(oMapImg, oCenter, 5, cv::Scalar(0, 255, 0), -1);
 		counter = counter == 0 ? 1 : counter;
 		arrowedLine(oMapImg, oCenter, oCenter + cv::Point(oForceVectorSum / counter * 10), cv::Scalar(0,0,255), 2, cv::LINE_AA);
 
@@ -373,6 +393,9 @@ protected:
 
 	void ProcessImg(cv::Mat oImg)
 	{
+		if (!m_bVisualOdomSet)
+			return;
+
 		clock_t t1 = clock();
 
 		// this should basically be the odometry of the car
@@ -382,6 +405,7 @@ protected:
 
 
 		// ros does not like to add positions, so convert them to Opencv points...
+		cv::Point3d oVisualPosePosition(m_oVisualOdomPose.position.x, m_oVisualOdomPose.position.y, m_oVisualOdomPose.position.z);
 		cv::Point3d oOdomPosePosition(m_oOdomPose.position.x, m_oOdomPose.position.y, m_oOdomPose.position.z);
 		cv::Point3d oOldOdomPosePosition(m_oOldOdomPose.position.x, m_oOldOdomPose.position.y, m_oOldOdomPose.position.z);
 		cv::Point3d oCurrentPosePosition(m_oCurrentPose.position.x, m_oCurrentPose.position.y, m_oCurrentPose.position.z);
@@ -458,7 +482,7 @@ protected:
 		else
 			dAngleCorrection += 0.1 * dOdomDiff + dTorqueMin;
 
-		double dForceVecLen = std::min(0.01 * GetVectorLength(oForceVector), 0.001);
+		double dForceVecLen = std::min(0.01 * GetVectorLength(oForceVector), 0.005);
 		if (dForceVecLen < 0.0004)
 			dForceVecLen = 0;
 
@@ -470,31 +494,32 @@ protected:
 		// right now its 10% of the length of the movement + at most 0.01
 		oForceVector *= (GetVectorLength(oOdomPosePosition - oOldOdomPosePosition) * 0.1  + dForceVecLen);
 
-		if (m_bIsFirstTime && !m_bIsLocalizing)
-		{
-			m_bIsLocalizing = true;
 
-			cv::Point2d oFirstPosition;
-			double dFirstAngle;
-//			GetGlobalPositionAndAngle(oFirstPosition, dFirstAngle, oPreparedCameraImg);
-//			oPosition.x = oFirstPosition.x;
-//			oPosition.y = oFirstPosition.y;
-//			fDifferentialYaw = dFirstAngle;
-			oPosition.x = 0;
-			oPosition.y = 0;
-			fDifferentialYaw = 0;
-
-			oForceVector = cv::Point2d(0,0);
-			dAngleCorrection = 0;
-			m_bIsFirstTime = false;
-			m_bIsLocalizing = false;
-
-		}
-		else if (m_bIsFirstTime && m_bIsLocalizing)
-		{
-			// if the global localization is running, dont do anything
-			return;
-		}
+//		if (m_bIsFirstTime && !m_bIsLocalizing)
+//		{
+//			m_bIsLocalizing = true;
+//
+//			cv::Point2d oFirstPosition;
+//			double dFirstAngle;
+////			GetGlobalPositionAndAngle(oFirstPosition, dFirstAngle, oPreparedCameraImg);
+////			oPosition.x = oFirstPosition.x;
+////			oPosition.y = oFirstPosition.y;
+////			fDifferentialYaw = dFirstAngle;
+//			oPosition.x = 0;
+//			oPosition.y = 0;
+//			fDifferentialYaw = 0;
+//
+//			oForceVector = cv::Point2d(0,0);
+//			dAngleCorrection = 0;
+//			m_bIsFirstTime = false;
+//			m_bIsLocalizing = false;
+//
+//		}
+//		else if (m_bIsFirstTime && m_bIsLocalizing)
+//		{
+//			// if the global localization is running, dont do anything
+//			return;
+//		}
 
 		std::cout << "dAngleCorrection: " << dAngleCorrection << std::endl;
 		std::cout << "forcevector length " << GetVectorLength(oForceVector) << std::endl;
@@ -514,13 +539,31 @@ protected:
 		std::cout << "Position: " << oPosition << ", forcevector: " << oForceVector << std::endl;
 
 		if (m_bPublishOverlay)
-			PublishMapOverlay(oPreparedCameraImg, oTransformationMat, oCenter, oOdomPosePosition);
-
-		nav_msgs::Odometry odom;
-		odom.header.stamp = ros::Time::now();
-		odom.header.frame_id = "odom";
+			PublishMapOverlay(oPreparedCameraImg, oTransformationMat, oCenter, oOdomPosePosition, oVisualPosePosition);
 
 		geometry_msgs::Quaternion odom_quat = tf::createQuaternionMsgFromYaw(fDifferentialYaw);
+
+		ros::Time current_time = ros::Time::now();
+
+	    //first, we'll publish the transform over tf
+	    geometry_msgs::TransformStamped oTransform;
+	    oTransform.header.stamp = current_time;
+	    oTransform.header.frame_id = "odom";
+	    oTransform.child_frame_id = "camera";
+
+	    oTransform.transform.translation.x = -0.2;
+	    oTransform.transform.translation.y = 0;
+	    oTransform.transform.translation.z = 0;
+	    oTransform.transform.rotation = tf::createQuaternionMsgFromYaw(0);
+
+	    //send the transform
+	    m_oTransformPub.sendTransform(oTransform);
+
+
+		nav_msgs::Odometry odom;
+		odom.header.stamp = current_time;
+		odom.header.frame_id = "camera";
+
 		m_oCurrentPose.orientation = odom_quat;
 		m_oCurrentPose.position.x = oPosition.x;
 		m_oCurrentPose.position.y = oPosition.y;

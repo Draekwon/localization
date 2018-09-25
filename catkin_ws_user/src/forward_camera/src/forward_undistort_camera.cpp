@@ -249,17 +249,17 @@ private:
 		cv::Point2f aObjectPoints[4];
 
 		// horizontal distance: 68 cm
-		aImagePoints[0] = cv::Point2f(0, 421);
-		aImagePoints[1] = cv::Point2f(639, 421);
-		// vertical distance: 116 cm
-		aImagePoints[2] = cv::Point2f(195, 302);
-		aImagePoints[3] = cv::Point2f(419, 302);
+		aImagePoints[0] = cv::Point2f(0, 420);
+		aImagePoints[1] = cv::Point2f(639, 418);
+		// vertical distance: about 110 cm
+		aImagePoints[2] = cv::Point2f(199, 303);
+		aImagePoints[3] = cv::Point2f(438, 308);
 
 
-		aObjectPoints[0] = cv::Point2f(217, 434);
-		aObjectPoints[1] = cv::Point2f(421, 434);
-		aObjectPoints[2] = cv::Point2f(217, 86);
-		aObjectPoints[3] = cv::Point2f(421, 86);
+		aObjectPoints[0] = cv::Point2f(217, 441);
+		aObjectPoints[1] = cv::Point2f(421, 439);
+		aObjectPoints[2] = cv::Point2f(217, 113);
+		aObjectPoints[3] = cv::Point2f(421, 110);
 
 		cv::Mat mPerspectiveTransform = cv::getPerspectiveTransform(aImagePoints, aObjectPoints);
 		cv::Mat mRectifiedImg;
@@ -283,6 +283,10 @@ private:
 
 		cv::Mat oImg;
 		pCvImg->image.copyTo(oImg);
+
+//		cv::imshow("normal", oImg);
+//		cv::waitKey(1);
+//		return;
 
 		WarpPerspective(oImg);
 //		cv::imshow("WarpPerspective", oImg);

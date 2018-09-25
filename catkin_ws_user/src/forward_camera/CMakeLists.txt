@@ -3,6 +3,7 @@ project( forward_camera )
 
 
 find_package(catkin REQUIRED COMPONENTS
+tf
 sensor_msgs
 cv_bridge
 roscpp
