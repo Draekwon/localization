@@ -20,6 +20,7 @@
 #include "std_msgs/String.h"
 #include "tf/tf.h"
 #include "tf/transform_broadcaster.h"
+#include <tf2_ros/transform_listener.h>
 #include "nav_msgs/Odometry.h"
 #include "geometry_msgs/Point.h"
 // opencv
@@ -31,6 +32,7 @@
 #include "opencv2/highgui.hpp"
 #include "opencv2/highgui/highgui.hpp"
 #include "opencv2/xfeatures2d.hpp"
+#include "opencv2/plot.hpp"
 
 #include "global_localization.cpp"
 #include "utility.h"
@@ -71,6 +73,11 @@ class CCameraOverlay
 	bool m_bIsLocalizing = false;
 
 	std::string m_sWindowName = "CamOverlay";
+
+	cv::Point3d m_oFirstOdomToCeilingDist = cv::Point3d(-1,-1,-1);
+	cv::Mat1d m_oCarOdomPlotData, m_oCarYawPlotData, m_oMatrixOdomPlotData, m_oMatrixYawPlotData, m_oPlotTimeStamps;
+	std::string m_sCarOdomPlotData, m_sCarYawPlotData, m_sMatrixOdomPlotData, m_sMatrixYawPlotData, m_sPlotTimeStamps;
+
 
 public:
 
@@ -128,7 +135,34 @@ public:
 
 	~CCameraOverlay()
 	{
+//	    cv::Ptr<cv::plot::Plot2d> pMatrixOdomPlot = cv::plot::Plot2d::create( m_oPlotTimeStamps, m_oMatrixOdomPlotData );
+//	    cv::Ptr<cv::plot::Plot2d> pCarOdomPlot = cv::plot::Plot2d::create( m_oPlotTimeStamps, m_oCarOdomPlotData );
+//	    cv::Ptr<cv::plot::Plot2d> pMatrixYawPlot = cv::plot::Plot2d::create( m_oPlotTimeStamps, m_oMatrixYawPlotData );
+//	    cv::Ptr<cv::plot::Plot2d> pCarYawPlot = cv::plot::Plot2d::create( m_oPlotTimeStamps, m_oCarYawPlotData );
+//	    cv::Mat oMatrixOdomPlotImg, oCarOdomPlotImg, oMatrixYawPlotImg, oCarYawPlotImg;
+//	    pMatrixOdomPlot->render(oMatrixOdomPlotImg);
+//	    pCarOdomPlot->render(oCarOdomPlotImg);
+//	    pMatrixYawPlot->render(oMatrixYawPlotImg);
+//	    pCarYawPlot->render(oCarYawPlotImg);
+//
+//	    cv::imwrite("oMatrixOdomPlotImg.png", oMatrixOdomPlotImg);
+//	    cv::imwrite("oCarOdomPlotImg.png", oCarOdomPlotImg);
+//	    cv::imwrite("oMatrixYawPlotImg.png", oMatrixYawPlotImg);
+//	    cv::imwrite("oCarYawPlotImg.png", oCarYawPlotImg);
 
+
+	    std::ofstream out("output.csv");
+
+	    out << m_sPlotTimeStamps << std::endl << m_sMatrixOdomPlotData << std::endl;
+	    out << m_sMatrixYawPlotData << std::endl << m_sCarOdomPlotData << std::endl;
+	    out << m_sCarYawPlotData;
+	    out.close();
+
+	    m_oOdomPub.shutdown();
+	    m_oOdomSub.shutdown();
+	    m_oVisualOdomSub.shutdown();
+	    m_oImagePub.shutdown();
+	    m_oImageSub.shutdown();
 	}
 
 
@@ -154,6 +188,12 @@ protected:
 	void OdomCallback(const nav_msgs::OdometryConstPtr& msg)
 	{
 		m_oOdomPose = msg->pose.pose;
+		if (m_oFirstOdomToCeilingDist == cv::Point3d(-1,-1,-1) && m_bVisualOdomSet)
+		{
+			m_oFirstOdomToCeilingDist.x = m_oVisualOdomPose.position.x - m_oOdomPose.position.x;
+			m_oFirstOdomToCeilingDist.y = m_oVisualOdomPose.position.y - m_oOdomPose.position.y;
+			m_oFirstOdomToCeilingDist.z = m_oVisualOdomPose.position.z - m_oOdomPose.position.z;
+		}
 		if (m_bFirstOdom)
 		{
 			m_bFirstOdom = false;
@@ -167,7 +207,7 @@ protected:
 	 * @param fYaw			the angle in radians
 	 * @param oCenter		the assumed position of the car in pixel coordinates
 	 */
-	void PublishMapOverlay(const cv::Mat& oContourImg, const cv::Mat& oRotMat, cv::Point& oCenter, cv::Point3d& oOdomCenter, cv::Point3d& oVisualOdomCenter)
+	void PublishMapOverlay(const cv::Mat& oContourImg, const cv::Mat& oRotMat, cv::Point oCenter, cv::Point3d oOdomCenter, cv::Point3d oVisualOdomCenter)
 	{
 		cv::Mat oMapImg = cv::Mat::zeros(m_oMapImg.size() * 2, CV_8UC3);
 		cv::Rect2f oBoundingBox(cv::Point2f(0,0), m_oMapImg.size() * 2);
@@ -402,6 +442,7 @@ protected:
 		double fOdomYaw = tf::getYaw(m_oOdomPose.orientation);
 		double fOldOdomYaw = tf::getYaw(m_oOldOdomPose.orientation);
 		double fYaw = tf::getYaw(m_oCurrentPose.orientation);
+		double fVisualYaw = tf::getYaw(m_oVisualOdomPose.orientation);
 
 
 		// ros does not like to add positions, so convert them to Opencv points...
@@ -430,7 +471,7 @@ protected:
 			oPosition = oCurrentPosePosition;
 		}
 
-		//! this adds a normal deviation to the odometry like in the paper
+		//! this adds a normal distribution to the odometry like in the paper
 		//! comment this out to save (a lot) of performance
 //		{
 //			cv::RNG rng(12354);
@@ -482,13 +523,13 @@ protected:
 		else
 			dAngleCorrection += 0.1 * dOdomDiff + dTorqueMin;
 
-		double dForceVecLen = std::min(0.01 * GetVectorLength(oForceVector), 0.005);
+		double dForceVecLen = std::min(0.01 * GetVectorLength(oForceVector), 0.01);
 		if (dForceVecLen < 0.0004)
 			dForceVecLen = 0;
 
 		std::cout << "dForceVecLen: " << dForceVecLen << std::endl;
 
-		// normalize the force vector
+		// normalize the force vectorfOdomYaw
 		oForceVector /= GetVectorLength(oForceVector);
 		// set the length of the force vector that will be added to the odometry as correction
 		// right now its 10% of the length of the movement + at most 0.01
@@ -541,28 +582,85 @@ protected:
 		if (m_bPublishOverlay)
 			PublishMapOverlay(oPreparedCameraImg, oTransformationMat, oCenter, oOdomPosePosition, oVisualPosePosition);
 
+
+		double dMatrixDistance = GetVectorLength(oPosition - oVisualPosePosition);
+		double dOdomDistance = GetVectorLength((oOdomPosePosition + m_oFirstOdomToCeilingDist) - oVisualPosePosition);
+
+		std::cout << "oOdomPosePosition " << oOdomPosePosition << " m_oFirstOdomToCeilingDist " << m_oFirstOdomToCeilingDist << " dOdomDistance " << dOdomDistance << std::endl;
+
+		double dMatrixYawDistance, dOdomYawDistance;
+		if ((fVisualYaw > 2 && fDifferentialYaw < -2) || (fVisualYaw < 2 && fDifferentialYaw > -2))
+			dMatrixYawDistance = abs(fVisualYaw + fDifferentialYaw);
+		else
+			dMatrixYawDistance = abs(fVisualYaw - fDifferentialYaw);
+		if ((fVisualYaw > 2 && fOdomYaw < -2) || (fVisualYaw < 2 && fOdomYaw > -2))
+			dOdomYawDistance = abs(fVisualYaw + fOdomYaw);
+		else
+			dOdomYawDistance = abs(fVisualYaw - fOdomYaw);
+
+
+		ros::Time oTimeStamp = ros::Time::now();
+
+		m_oPlotTimeStamps.push_back(oTimeStamp.toSec());
+		m_oMatrixOdomPlotData.push_back(dMatrixDistance);
+		m_oCarOdomPlotData.push_back(dOdomDistance);
+		m_oMatrixYawPlotData.push_back(dMatrixYawDistance * 180 / M_PI);
+		m_oCarYawPlotData.push_back(dOdomYawDistance * 180 / M_PI);
+
+		m_sPlotTimeStamps += std::to_string(oTimeStamp.toSec()) + ",";
+		m_sMatrixOdomPlotData += std::to_string(dMatrixDistance) + ",";
+		m_sCarOdomPlotData += std::to_string(dOdomDistance) + ",";
+		m_sMatrixYawPlotData += std::to_string(dMatrixYawDistance * 180 / M_PI) + ",";
+		m_sCarYawPlotData += std::to_string(dOdomYawDistance * 180 / M_PI) + ",";
+
+
+	    cv::Ptr<cv::plot::Plot2d> pMatrixOdomPlot = cv::plot::Plot2d::create( m_oPlotTimeStamps, m_oMatrixOdomPlotData );
+	    pMatrixOdomPlot->setShowText( true );
+	    pMatrixOdomPlot->setShowGrid( false );
+	    pMatrixOdomPlot->setPlotBackgroundColor( cv::Scalar( 255, 255, 255 ) );
+	    pMatrixOdomPlot->setPlotLineColor( cv::Scalar( 255, 0, 0 ) );
+	    pMatrixOdomPlot->setPlotLineWidth( 2 );
+	    pMatrixOdomPlot->setPlotTextColor(cv::Scalar(0,0,0));
+	    cv::Ptr<cv::plot::Plot2d> pCarOdomPlot = cv::plot::Plot2d::create( m_oPlotTimeStamps, m_oCarOdomPlotData );
+	    pCarOdomPlot->setShowText( true );
+	    pCarOdomPlot->setShowGrid( false );
+	    pCarOdomPlot->setPlotBackgroundColor( cv::Scalar( 255, 255, 255 ) );
+	    pCarOdomPlot->setPlotLineColor( cv::Scalar( 255, 0, 0 ) );
+	    pCarOdomPlot->setPlotLineWidth( 2 );
+	    pCarOdomPlot->setPlotTextColor(cv::Scalar(0,0,0));
+	    cv::Ptr<cv::plot::Plot2d> pMatrixYawPlot = cv::plot::Plot2d::create( m_oPlotTimeStamps, m_oMatrixYawPlotData );
+	    pMatrixYawPlot->setShowText( true );
+	    pMatrixYawPlot->setShowGrid( false );
+	    pMatrixYawPlot->setPlotBackgroundColor( cv::Scalar( 255, 255, 255 ) );
+	    pMatrixYawPlot->setPlotLineColor( cv::Scalar( 255, 0, 0 ) );
+	    pMatrixYawPlot->setPlotLineWidth( 2 );
+	    pMatrixYawPlot->setPlotTextColor(cv::Scalar(0,0,0));
+	    cv::Ptr<cv::plot::Plot2d> pCarYawPlot = cv::plot::Plot2d::create( m_oPlotTimeStamps, m_oCarYawPlotData );
+	    pCarYawPlot->setShowText( true );
+	    pCarYawPlot->setShowGrid( false );
+	    pCarYawPlot->setPlotBackgroundColor( cv::Scalar( 255, 255, 255 ) );
+	    pCarYawPlot->setPlotLineColor( cv::Scalar( 255, 0, 0 ) );
+	    pCarYawPlot->setPlotLineWidth( 2 );
+	    pCarYawPlot->setPlotTextColor(cv::Scalar(0,0,0));
+
+	    cv::Mat oMatrixOdomPlotImg, oCarOdomPlotImg, oMatrixYawPlotImg, oCarYawPlotImg;
+	    pMatrixOdomPlot->render(oMatrixOdomPlotImg);
+	    pCarOdomPlot->render(oCarOdomPlotImg);
+	    pMatrixYawPlot->render(oMatrixYawPlotImg);
+	    pCarYawPlot->render(oCarYawPlotImg);
+
+	    cv::imshow("oMatrixOdomPlotImg", oMatrixOdomPlotImg);
+	    cv::imshow("oCarOdomPlotImg", oCarOdomPlotImg);
+	    cv::imshow("oMatrixYawPlotImg", oMatrixYawPlotImg);
+	    cv::imshow("oCarYawPlotImg", oCarYawPlotImg);
+	    cv::waitKey(1);
+
+
 		geometry_msgs::Quaternion odom_quat = tf::createQuaternionMsgFromYaw(fDifferentialYaw);
 
-		ros::Time current_time = ros::Time::now();
-
-	    //first, we'll publish the transform over tf
-	    geometry_msgs::TransformStamped oTransform;
-	    oTransform.header.stamp = current_time;
-	    oTransform.header.frame_id = "odom";
-	    oTransform.child_frame_id = "camera";
-
-	    oTransform.transform.translation.x = -0.2;
-	    oTransform.transform.translation.y = 0;
-	    oTransform.transform.translation.z = 0;
-	    oTransform.transform.rotation = tf::createQuaternionMsgFromYaw(0);
-
-	    //send the transform
-	    m_oTransformPub.sendTransform(oTransform);
-
-
 		nav_msgs::Odometry odom;
-		odom.header.stamp = current_time;
-		odom.header.frame_id = "camera";
+		odom.header.stamp = oTimeStamp;
+		odom.header.frame_id = "odom";
 
 		m_oCurrentPose.orientation = odom_quat;
 		m_oCurrentPose.position.x = oPosition.x;

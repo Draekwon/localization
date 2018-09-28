@@ -237,7 +237,14 @@ private:
 //		cv::split(oHlsImg, channels);
 //		cv::adaptiveThreshold(channels[1], oImg, 255, cv::ADAPTIVE_THRESH_MEAN_C, cv::THRESH_BINARY_INV, 3, 8);
 
-		cv::inRange(oHlsImg, cv::Scalar(0, 175, 0), cv::Scalar(255, 255, 255), oImg);
+		cv::Mat mask1, mask2;
+
+		cv::inRange(oHlsImg, cv::Scalar(0, 175, 0), cv::Scalar(70, 255, 255), mask1);
+		cv::inRange(oHlsImg, cv::Scalar(210, 175, 0), cv::Scalar(255, 255, 255), mask2);
+
+		cv::bitwise_or(mask1, mask2, oImg);
+
+//		cv::inRange(oHlsImg, cv::Scalar(200, 175, 0), cv::Scalar(60, 255, 255), oImg);
 
 		cv::dilate(oImg, oImg, cv::Mat(), cv::Point(-1, -1), 2);
 		cv::erode(oImg, oImg, cv::Mat(), cv::Point(-1,-1), 1);

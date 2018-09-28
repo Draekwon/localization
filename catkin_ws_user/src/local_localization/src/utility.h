@@ -23,8 +23,9 @@ const int VECTOR_FIELD_DISTANCE = 4;
 const cv::Size CAR_SIZE = cv::Size(26, 60);
 //const cv::Size CAR_SIZE = cv::Size(0, 0);
 
-//! 50 cm distance between the car and the first point it can see in the forward camera perspective
-const double FOV_DISTANCE_TO_CAR = 49.5;
+//! 50 cm distance between the camera and the first point it can see in the forward camera perspective
+//! 22 cm distance between the camera and the hind axis
+const double FOV_DISTANCE_TO_CAR = 50 + 22;
 
 // convenience functions
 
