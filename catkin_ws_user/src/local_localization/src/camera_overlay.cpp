@@ -533,7 +533,7 @@ protected:
 		oForceVector /= GetVectorLength(oForceVector);
 		// set the length of the force vector that will be added to the odometry as correction
 		// right now its 10% of the length of the movement + at most 0.01
-		oForceVector *= (GetVectorLength(oOdomPosePosition - oOldOdomPosePosition) * 0.1  + dForceVecLen);
+		oForceVector *= (GetVectorLength(oOdomPosePosition - oOldOdomPosePosition) * 0.5  + dForceVecLen);
 
 
 //		if (m_bIsFirstTime && !m_bIsLocalizing)
@@ -601,66 +601,66 @@ protected:
 
 		ros::Time oTimeStamp = ros::Time::now();
 
-		m_oPlotTimeStamps.push_back(oTimeStamp.toSec());
+		m_oPlotTimeStamps.push_back(oTimeStamp.nsec * pow(10,9));
 		m_oMatrixOdomPlotData.push_back(dMatrixDistance);
 		m_oCarOdomPlotData.push_back(dOdomDistance);
 		m_oMatrixYawPlotData.push_back(dMatrixYawDistance * 180 / M_PI);
 		m_oCarYawPlotData.push_back(dOdomYawDistance * 180 / M_PI);
 
-		m_sPlotTimeStamps += std::to_string(oTimeStamp.toSec()) + ",";
+		m_sPlotTimeStamps += std::to_string(oTimeStamp.nsec * pow(10,9)) + ",";
 		m_sMatrixOdomPlotData += std::to_string(dMatrixDistance) + ",";
 		m_sCarOdomPlotData += std::to_string(dOdomDistance) + ",";
 		m_sMatrixYawPlotData += std::to_string(dMatrixYawDistance * 180 / M_PI) + ",";
 		m_sCarYawPlotData += std::to_string(dOdomYawDistance * 180 / M_PI) + ",";
 
-
-	    cv::Ptr<cv::plot::Plot2d> pMatrixOdomPlot = cv::plot::Plot2d::create( m_oPlotTimeStamps, m_oMatrixOdomPlotData );
-	    pMatrixOdomPlot->setShowText( true );
-	    pMatrixOdomPlot->setShowGrid( false );
-	    pMatrixOdomPlot->setPlotBackgroundColor( cv::Scalar( 255, 255, 255 ) );
-	    pMatrixOdomPlot->setPlotLineColor( cv::Scalar( 255, 0, 0 ) );
-	    pMatrixOdomPlot->setPlotLineWidth( 2 );
-	    pMatrixOdomPlot->setPlotTextColor(cv::Scalar(0,0,0));
-	    cv::Ptr<cv::plot::Plot2d> pCarOdomPlot = cv::plot::Plot2d::create( m_oPlotTimeStamps, m_oCarOdomPlotData );
-	    pCarOdomPlot->setShowText( true );
-	    pCarOdomPlot->setShowGrid( false );
-	    pCarOdomPlot->setPlotBackgroundColor( cv::Scalar( 255, 255, 255 ) );
-	    pCarOdomPlot->setPlotLineColor( cv::Scalar( 255, 0, 0 ) );
-	    pCarOdomPlot->setPlotLineWidth( 2 );
-	    pCarOdomPlot->setPlotTextColor(cv::Scalar(0,0,0));
-	    cv::Ptr<cv::plot::Plot2d> pMatrixYawPlot = cv::plot::Plot2d::create( m_oPlotTimeStamps, m_oMatrixYawPlotData );
-	    pMatrixYawPlot->setShowText( true );
-	    pMatrixYawPlot->setShowGrid( false );
-	    pMatrixYawPlot->setPlotBackgroundColor( cv::Scalar( 255, 255, 255 ) );
-	    pMatrixYawPlot->setPlotLineColor( cv::Scalar( 255, 0, 0 ) );
-	    pMatrixYawPlot->setPlotLineWidth( 2 );
-	    pMatrixYawPlot->setPlotTextColor(cv::Scalar(0,0,0));
-	    cv::Ptr<cv::plot::Plot2d> pCarYawPlot = cv::plot::Plot2d::create( m_oPlotTimeStamps, m_oCarYawPlotData );
-	    pCarYawPlot->setShowText( true );
-	    pCarYawPlot->setShowGrid( false );
-	    pCarYawPlot->setPlotBackgroundColor( cv::Scalar( 255, 255, 255 ) );
-	    pCarYawPlot->setPlotLineColor( cv::Scalar( 255, 0, 0 ) );
-	    pCarYawPlot->setPlotLineWidth( 2 );
-	    pCarYawPlot->setPlotTextColor(cv::Scalar(0,0,0));
-
-	    cv::Mat oMatrixOdomPlotImg, oCarOdomPlotImg, oMatrixYawPlotImg, oCarYawPlotImg;
-	    pMatrixOdomPlot->render(oMatrixOdomPlotImg);
-	    pCarOdomPlot->render(oCarOdomPlotImg);
-	    pMatrixYawPlot->render(oMatrixYawPlotImg);
-	    pCarYawPlot->render(oCarYawPlotImg);
-
-	    cv::imshow("oMatrixOdomPlotImg", oMatrixOdomPlotImg);
-	    cv::imshow("oCarOdomPlotImg", oCarOdomPlotImg);
-	    cv::imshow("oMatrixYawPlotImg", oMatrixYawPlotImg);
-	    cv::imshow("oCarYawPlotImg", oCarYawPlotImg);
-	    cv::waitKey(1);
+//
+//	    cv::Ptr<cv::plot::Plot2d> pMatrixOdomPlot = cv::plot::Plot2d::create( m_oPlotTimeStamps, m_oMatrixOdomPlotData );
+//	    pMatrixOdomPlot->setShowText( true );
+//	    pMatrixOdomPlot->setShowGrid( false );
+//	    pMatrixOdomPlot->setPlotBackgroundColor( cv::Scalar( 255, 255, 255 ) );
+//	    pMatrixOdomPlot->setPlotLineColor( cv::Scalar( 255, 0, 0 ) );
+//	    pMatrixOdomPlot->setPlotLineWidth( 2 );
+//	    pMatrixOdomPlot->setPlotTextColor(cv::Scalar(0,0,0));
+//	    cv::Ptr<cv::plot::Plot2d> pCarOdomPlot = cv::plot::Plot2d::create( m_oPlotTimeStamps, m_oCarOdomPlotData );
+//	    pCarOdomPlot->setShowText( true );
+//	    pCarOdomPlot->setShowGrid( false );
+//	    pCarOdomPlot->setPlotBackgroundColor( cv::Scalar( 255, 255, 255 ) );
+//	    pCarOdomPlot->setPlotLineColor( cv::Scalar( 255, 0, 0 ) );
+//	    pCarOdomPlot->setPlotLineWidth( 2 );
+//	    pCarOdomPlot->setPlotTextColor(cv::Scalar(0,0,0));
+//	    cv::Ptr<cv::plot::Plot2d> pMatrixYawPlot = cv::plot::Plot2d::create( m_oPlotTimeStamps, m_oMatrixYawPlotData );
+//	    pMatrixYawPlot->setShowText( true );
+//	    pMatrixYawPlot->setShowGrid( false );
+//	    pMatrixYawPlot->setPlotBackgroundColor( cv::Scalar( 255, 255, 255 ) );
+//	    pMatrixYawPlot->setPlotLineColor( cv::Scalar( 255, 0, 0 ) );
+//	    pMatrixYawPlot->setPlotLineWidth( 2 );
+//	    pMatrixYawPlot->setPlotTextColor(cv::Scalar(0,0,0));
+//	    cv::Ptr<cv::plot::Plot2d> pCarYawPlot = cv::plot::Plot2d::create( m_oPlotTimeStamps, m_oCarYawPlotData );
+//	    pCarYawPlot->setShowText( true );
+//	    pCarYawPlot->setShowGrid( false );
+//	    pCarYawPlot->setPlotBackgroundColor( cv::Scalar( 255, 255, 255 ) );
+//	    pCarYawPlot->setPlotLineColor( cv::Scalar( 255, 0, 0 ) );
+//	    pCarYawPlot->setPlotLineWidth( 2 );
+//	    pCarYawPlot->setPlotTextColor(cv::Scalar(0,0,0));
+//
+//	    cv::Mat oMatrixOdomPlotImg, oCarOdomPlotImg, oMatrixYawPlotImg, oCarYawPlotImg;
+//	    pMatrixOdomPlot->render(oMatrixOdomPlotImg);
+//	    pCarOdomPlot->render(oCarOdomPlotImg);
+//	    pMatrixYawPlot->render(oMatrixYawPlotImg);
+//	    pCarYawPlot->render(oCarYawPlotImg);
+//
+//	    cv::imshow("oMatrixOdomPlotImg", oMatrixOdomPlotImg);
+//	    cv::imshow("oCarOdomPlotImg", oCarOdomPlotImg);
+//	    cv::imshow("oMatrixYawPlotImg", oMatrixYawPlotImg);
+//	    cv::imshow("oCarYawPlotImg", oCarYawPlotImg);
+//	    cv::waitKey(1);
 
 
 		geometry_msgs::Quaternion odom_quat = tf::createQuaternionMsgFromYaw(fDifferentialYaw);
 
 		nav_msgs::Odometry odom;
 		odom.header.stamp = oTimeStamp;
-		odom.header.frame_id = "odom";
+		odom.header.frame_id = "map";
 
 		m_oCurrentPose.orientation = odom_quat;
 		m_oCurrentPose.position.x = oPosition.x;
